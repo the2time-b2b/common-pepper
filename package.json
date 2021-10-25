@@ -1,0 +1,31 @@
+{
+  "name": "common-pepper",
+  "version": "1.0.0",
+  "description": "A twitch user's personal butler.",
+  "main": "common-pepper.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pysudo/common-pepper.git"
+  },
+  "keywords": [
+    "twitch",
+    "bot",
+    "mrdestructoid",
+    "chats",
+    "chatting",
+    "chatter"
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/pysudo/common-pepper/issues"
+  },
+  "homepage": "https://github.com/pysudo/common-pepper#readme",
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "tmi.js": "^1.8.5"
+  }
+}
