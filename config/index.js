@@ -1,3 +1,3 @@
 module.exports = {
-    opts: require('./twitch-config')
+  opts: require("./twitch-config")
 };
