@@ -7,7 +7,7 @@ const logger = require("./utils/logger");
 
 const configProps = {
   PREFIX: process.env.PREFIX,
-  SEND_INTERVAL: parseInt(process.env.SEND_INTERVAL) || 30,
+  SEND_INTERVAL: process.env.SEND_INTERVAL || 30,
   DUPMSG_CHAR: process.env.DUPMSG_CHAR,
   LAST_SENT: Date.now(),
   DUPMSG_STATUS: null // Set to null to indicate first bot message after reset
@@ -36,7 +36,7 @@ function onMessageHandler(client, target, context, msg, self) {
   const dupMsgStatus = configProps.DUPMSG_STATUS;
   const dupMsgChar = configProps.DUPMSG_CHAR;
   const lastSent = configProps.LAST_SENT;
-  const sendInterval = configProps.SEND_INTERVAL;
+  const sendInterval = parseInt(configProps.SEND_INTERVAL);
 
   // Ignore messages from the bot
   if (self) {
