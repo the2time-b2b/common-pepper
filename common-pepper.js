@@ -3,7 +3,7 @@ const tmi = require("tmi.js");
 
 const { opts } = require("./config");
 const logger = require("./utils/logger");
-
+const { execCmd } = require("./commands/helper");
 
 const configProps = {
   PREFIX: process.env.PREFIX,
@@ -19,7 +19,7 @@ try {
     // Create a client with our options
     const client = new tmi.client(opts);
 
-    client.on("message", function () {
+    client.on("message", function() {
       onMessageHandler(client, ...arguments);
     });
     client.on("connected", onConnectedHandler);
@@ -31,6 +31,7 @@ catch (err) { console.error(err); }
 
 
 function onMessageHandler(client, target, context, msg, self) {
+  const nodeEnv = process.env.NODE_ENV || "dev";
   const prefix = configProps.PREFIX;
   const prefixLength = prefix.length;
   const dupMsgStatus = configProps.DUPMSG_STATUS;
@@ -59,26 +60,25 @@ function onMessageHandler(client, target, context, msg, self) {
   *whitespaces, tabs or newlines between words with just one whitespace
   */
   const request = msg.trim().replace(/\s\s+/g, " ").split(" ");
-  let response = request.join(" ");
+  let response = (request[0] === `${prefix}testCmd` && nodeEnv === "test")
+    ? request.join(" ")
+    : execCmd(context, request);
 
   // Circumvents Twitch's duplicate message filter
   if (dupMsgStatus === "1") {
     response = response + ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
   }
 
-  logger.info(`* Raw request "${msg}" Received`);
-  logger.info(`* Executed "${request.join(" ")}" command`);
+  logger.info(`\n* Raw request "${msg}" Received`);
 
-  if (request) {
-    if (["live", "test"].includes(process.env.NODE_ENV)) {
-      client.say(target, response);
-      configProps.LAST_SENT = Date.now();
-    }
-    else if (process.env.NODE_ENV === "dev") {
-      logger.info({ target, response });
-      configProps.LAST_SENT = Date.now();
-    }
-  } else logger.info(`* Unknown command ${request.join(" ")}`);
+  if (response) {
+    logger.info(`* Executed "${request.join(" ")}" command`);
+    configProps.LAST_SENT = Date.now();
+
+    if (["live", "test"].includes(nodeEnv)) client.say(target, response);
+    else if (nodeEnv === "dev") logger.info({ target, response });
+  }
+  else logger.info(`* Unknown command ${request.join(" ")}`);
 }
 
 

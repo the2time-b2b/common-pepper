@@ -16,7 +16,7 @@ describe("Message handler should", () => {
   describe("be able to ", () => {
     it("respond if a prefixed messages is received", () => {
       const { context, self } = entities.user;
-      const msg = `${configProps.PREFIX}command test message from the user`;
+      const msg = `${configProps.PREFIX}testCmd test message from the user`;
       const args = [context, msg, self];
 
       testFunctionCallStatus(msg, args, "toBeCalled");
@@ -24,7 +24,7 @@ describe("Message handler should", () => {
 
     it("ignores messages with no prefix", () => {
       const { context, self } = entities.user;
-      const msg = "command test message from the user";
+      const msg = "testCmd test message from the user";
       const args = [context, msg, self];
 
       testFunctionCallStatus(msg, args, "notToBeCalled");
@@ -32,8 +32,8 @@ describe("Message handler should", () => {
 
     test("replace multiple whitespaces with a single whitespace", () => {
       const { context, self } = entities.user;
-      const expectedMsg = `${configProps.PREFIX}command test message from user`;
-      let actualMessage = `${configProps.PREFIX}command             `;
+      const expectedMsg = `${configProps.PREFIX}testCmd test message from user`;
+      let actualMessage = `${configProps.PREFIX}testCmd             `;
       actualMessage += "test         message from         user             ";
       const args = [context, actualMessage, self];
 
@@ -42,7 +42,7 @@ describe("Message handler should", () => {
 
     it("ignore messages from bot's own request", () => {
       const { context, self } = entities.bot;
-      const msg = `${configProps.PREFIX}command test message from the bot`;
+      const msg = `${configProps.PREFIX}testCmd test message from the bot`;
       const args = [context, msg, self];
 
       testFunctionCallStatus(msg, args, "notToBeCalled");
@@ -52,7 +52,7 @@ describe("Message handler should", () => {
 
   describe("circumvent message duplication filter where,", () => {
     const user = entities.user;
-    const msg = `${configProps.PREFIX}command same message from the user`;
+    const msg = `${configProps.PREFIX}testCmd same message from the user`;
     const filterByPassChar = "\udb40\udc00";
     const args = [user.context, msg, user.self];
 
@@ -73,12 +73,13 @@ describe("Message handler should", () => {
 
   describe("watch the set SEND_INTERVAL value and", () => {
     const user = entities.user;
-    const msg = `${configProps.PREFIX}command same message from the user`;
+    const msg = `${configProps.PREFIX}testCmd same message from the user`;
     const args = [user.context, msg, user.self];
 
     const initialTimeElapsed = 5; // In sec
     const finalTimeElapsed = 15; // In sec
-    configProps.SEND_INTERVAL = 20; // In sec
+
+    beforeEach(() => configProps.SEND_INTERVAL = 20); // In sec
     jest.useFakeTimers();
 
     it("it should respond for every initial user request", () => {
@@ -114,6 +115,12 @@ function toBe(expectedTarget, expectedResponse) {
 }
 
 
+/**
+* Mimic an 'on message' event triggered by the bot itself to change the state of
+* DUPMSG_STATUS from null to either '0' or '1'.
+* @param {boolean} [circumvented=false] - Response circumvents message
+* duplication filter.
+*/
 function mimicMessageEventByBot(circumvented = false) {
   if (!circumvented) {
     configProps.DUPMSG_STATUS = "0";
