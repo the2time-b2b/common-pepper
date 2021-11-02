@@ -64,19 +64,20 @@ function onMessageHandler(client, target, context, msg, self) {
     ? request.join(" ")
     : execCmd(context, request);
 
-  // Circumvents Twitch's duplicate message filter
-  if (dupMsgStatus === "1") {
-    response = response + ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
-  }
-
   logger.info(`\n* Raw request "${msg}" Received`);
 
   if (response) {
     logger.info(`* Executed "${request.join(" ")}" command`);
-    configProps.LAST_SENT = Date.now();
+
+    // Circumvents Twitch's duplicate message filter
+    if (dupMsgStatus === "1") {
+      response += ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
+    }
 
     if (["live", "test"].includes(nodeEnv)) client.say(target, response);
     else if (nodeEnv === "dev") logger.info({ target, response });
+
+    configProps.LAST_SENT = Date.now();
   }
   else logger.info(`* Unknown command ${request.join(" ")}`);
 }
