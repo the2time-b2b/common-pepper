@@ -6,4 +6,8 @@ const ping = {
   }
 };
 
-module.exports = { ping };
+
+module.exports = {
+  ping,
+  ...require("./say")
+};
