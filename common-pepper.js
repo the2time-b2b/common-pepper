@@ -47,6 +47,7 @@ function onMessageHandler(client, target, context, msg, self) {
 
   // Ignore non-prefixed messages
   if (!(msg.substring(0, prefixLength) === prefix)) return;
+  const command = msg;
 
   /*
   * Prevents intentional/unintentional global cooldown
@@ -59,12 +60,14 @@ function onMessageHandler(client, target, context, msg, self) {
   *Trims whitespace on either side of the chat message and replaces multiple
   *whitespaces, tabs or newlines between words with just one whitespace
   */
-  const request = msg.trim().replace(/\s\s+/g, " ").split(" ");
+  const request = command.trim().replace(/\s\s+/g, " ").split(" ");
+
+  // Command with name testCmd reserved for test only.
   let response = (request[0] === `${prefix}testCmd` && nodeEnv === "test")
     ? request.join(" ")
     : execCmd(context, request);
 
-  logger.info(`\n* Raw request "${msg}" Received`);
+  logger.info(`\n* Raw request "${command}" Received`);
 
   if (response) {
     logger.info(`* Executed "${request.join(" ")}" command`);

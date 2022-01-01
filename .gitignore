@@ -9,3 +9,6 @@ coverage
 
 # vscode configurations
 .vscode
+
+# local db
+tasks-db*.json

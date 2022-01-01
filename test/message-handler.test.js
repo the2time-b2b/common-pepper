@@ -1,5 +1,6 @@
-const { onMessageHandler, configProps } = require("../common-pepper");
+const { configProps } = require("../common-pepper");
 const entities = require("./context");
+const { mimicMessageEventByBot, testFunctionCallStatus } = require("./helper");
 
 
 describe("Message handler should", () => {
@@ -17,17 +18,15 @@ describe("Message handler should", () => {
     it("respond if a prefixed messages is received", () => {
       const { context, self } = entities.user;
       const msg = `${configProps.PREFIX}testCmd test message from the user`;
-      const args = [context, msg, self];
 
-      testFunctionCallStatus(msg, args, "toBeCalled");
+      testFunctionCallStatus(context, msg, self, "toBeCalled");
     });
 
     it("ignores messages with no prefix", () => {
       const { context, self } = entities.user;
       const msg = "testCmd test message from the user";
-      const args = [context, msg, self];
 
-      testFunctionCallStatus(msg, args, "notToBeCalled");
+      testFunctionCallStatus(context, msg, self, "notToBeCalled");
     });
 
     test("replace multiple whitespaces with a single whitespace", () => {
@@ -35,17 +34,17 @@ describe("Message handler should", () => {
       const expectedMsg = `${configProps.PREFIX}testCmd test message from user`;
       let actualMessage = `${configProps.PREFIX}testCmd             `;
       actualMessage += "test         message from         user             ";
-      const args = [context, actualMessage, self];
 
-      testFunctionCallStatus(expectedMsg, args, "toBeCalled");
+      testFunctionCallStatus(
+        context, actualMessage, self, "toBeCalled", expectedMsg
+      );
     });
 
     it("ignore messages from bot's own request", () => {
       const { context, self } = entities.bot;
       const msg = `${configProps.PREFIX}testCmd test message from the bot`;
-      const args = [context, msg, self];
 
-      testFunctionCallStatus(msg, args, "notToBeCalled");
+      testFunctionCallStatus(context, msg, self, "notToBeCalled");
     });
   });
 
@@ -54,10 +53,9 @@ describe("Message handler should", () => {
     const user = entities.user;
     const msg = `${configProps.PREFIX}testCmd same message from the user`;
     const filterByPassChar = "\udb40\udc00";
-    const args = [user.context, msg, user.self];
 
     it("it responds to initial user request unaltered", () => {
-      testFunctionCallStatus(msg, args, "toBeCalled");
+      testFunctionCallStatus(user.context, msg, user.self, "toBeCalled");
     });
 
 
@@ -66,7 +64,9 @@ describe("Message handler should", () => {
       mimicMessageEventByBot(true);
       configProps.SEND_INTERVAL = 0;
 
-      testFunctionCallStatus(`${msg} ${filterByPassChar}`, args, "toBeCalled");
+      testFunctionCallStatus(
+        user.context, msg, user.self, "toBeCalled", `${msg} ${filterByPassChar}`
+      );
     });
   });
 
@@ -74,7 +74,6 @@ describe("Message handler should", () => {
   describe("watch the set SEND_INTERVAL value and", () => {
     const user = entities.user;
     const msg = `${configProps.PREFIX}testCmd same message from the user`;
-    const args = [user.context, msg, user.self];
 
     const initialTimeElapsed = 5; // In sec
     const finalTimeElapsed = 15; // In sec
@@ -83,7 +82,7 @@ describe("Message handler should", () => {
     jest.useFakeTimers();
 
     it("it should respond for every initial user request", () => {
-      testFunctionCallStatus(msg, args, "toBeCalled");
+      testFunctionCallStatus(user.context, msg, user.self, "toBeCalled");
     });
 
     jest.advanceTimersByTime(initialTimeElapsed * 1000);
@@ -91,54 +90,15 @@ describe("Message handler should", () => {
     it("it should not respond if elapsed time is less than set value", () => {
       mimicMessageEventByBot();
 
-      testFunctionCallStatus(msg, args, "notToBeCalled");
+      testFunctionCallStatus(user.context, msg, user.self, "notToBeCalled");
     });
 
     jest.advanceTimersByTime(finalTimeElapsed * 1000);
 
     it("it should respond if elapsed time is greater than set value", () => {
-      testFunctionCallStatus(msg, args, "toBeCalled");
+      testFunctionCallStatus(user.context, msg, user.self, "toBeCalled");
     });
 
     jest.useRealTimers();
   });
 });
-
-
-function toBe(expectedTarget, expectedResponse) {
-  return {
-    say: (target, response) => {
-      expect(target).toBe(expectedTarget);
-      expect(response).toBe(expectedResponse);
-    }
-  };
-}
-
-
-/**
-* Mimic an 'on message' event triggered by the bot itself to change the state of
-* DUPMSG_STATUS from null to either '0' or '1'.
-* @param {boolean} [circumvented=false] - Response circumvents message
-* duplication filter.
-*/
-function mimicMessageEventByBot(circumvented = false) {
-  if (!circumvented) {
-    configProps.DUPMSG_STATUS = "0";
-  }
-  else {
-    configProps.DUPMSG_STATUS = "1";
-  }
-}
-
-
-function testFunctionCallStatus(msg, args, type) {
-  const target = "#sven_snusberg";
-
-  const client = toBe(target, msg);
-  const say = jest.spyOn(client, "say");
-
-  onMessageHandler(client, target, ...args);
-
-  if (type === "toBeCalled") expect(say).toBeCalled();
-  if (type === "notToBeCalled") expect(say).not.toBeCalled();
-}
