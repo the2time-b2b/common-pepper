@@ -1,10 +1,10 @@
 const fs = require("fs");
 
-
 const { onMessageHandler, configProps } = require("../../common-pepper");
 const { user: userEntitity } = require("../context");
 const { say, DB_PATH } = require("../../commands/main/say/index");
 const { toBe } = require("../helper");
+
 
 describe("The 'say' command should", () => {
   const { context, self } = userEntitity;
@@ -330,8 +330,46 @@ describe("The 'say' command should", () => {
   });
 
 
+  describe("handle JSON database error where", () => {
+    test("there is an invalid JSON format", () => {
+      fs.writeFileSync(DB_PATH, "[{}}]");
+
+      const newTask = {
+        totalWaitInterval: 3600,
+        channel: "channel",
+        taskMessage: "test message"
+      };
+
+      const func = jest.spyOn(console, "error");
+      say.updateTaskList("task-name", newTask, "create");
+      expect(func).toHaveBeenCalledWith(
+        "Unexpected token } in JSON at position 3 for the file in path: "
+        + DB_PATH
+      );
+    });
+
+    test("the JSON database file does not exist", () => {
+      fs.rmSync(DB_PATH);
+
+      const newTask = {
+        totalWaitInterval: 3600,
+        channel: "channel",
+        taskMessage: "test message"
+      };
+
+      const func = jest.spyOn(console, "error");
+      say.updateTaskList("task-name", newTask, "create");
+      expect(func).toHaveBeenCalledWith(
+        `ENOENT: no such file or directory, open '${DB_PATH}'`
+      );
+    });
+  });
+
+
   afterAll(() => {
-    fs.rmSync(DB_PATH); // Remove JSON database used for testing.
+    if (fs.existsSync(DB_PATH)) {
+      fs.rmSync(DB_PATH); // Remove JSON database used for testing.
+    }
     expect(fs.existsSync(DB_PATH)).toBeFalsy();
   });
 });

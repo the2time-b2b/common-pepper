@@ -32,7 +32,6 @@ module.exports = {
 
     "eol-last": ["error", "always"],
     "indent": ["error", 2, { "SwitchCase": 1 }],
-    "linebreak-style": ["error", "windows"],
     "object-curly-spacing": ["error", "always"],
     "quotes": ["error", "double"],
     "semi": ["error", "always"],
