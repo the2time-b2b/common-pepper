@@ -24,6 +24,8 @@ describe("The 'say' command should", () => {
 
   test("have a JSON database initialized if it doesn't exists", () => {
     expect(fs.existsSync(DB_PATH)).toBeTruthy();
+    const db = fs.readFileSync(DB_PATH);
+    expect(JSON.parse(db)).toEqual([{}]);
   });
 
   test("accept a well-crafted request", () => {
@@ -362,6 +364,16 @@ describe("The 'say' command should", () => {
       expect(func).toHaveBeenCalledWith(
         `ENOENT: no such file or directory, open '${DB_PATH}'`
       );
+    });
+
+    test("allow users to clear the JSON database", () => {
+      const command = cmdName + "clear task list";
+      const args = [context, command, self];
+      const client = toBe(target, "The task list has been wiped clean.");
+      onMessageHandler(client, target, ...args);
+
+      const db = fs.readFileSync(DB_PATH);
+      expect(JSON.parse(db)).toEqual([{}]);
     });
   });
 

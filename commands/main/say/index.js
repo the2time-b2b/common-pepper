@@ -39,6 +39,10 @@ const say = {
    * @returns {string}
    */
   exec: function(context, request) {
+    if (request.join(" ") === "clear task list") {
+      fs.writeFileSync(DB_PATH, JSON.stringify([{}], null, 2));
+      return "The task list has been wiped clean.";
+    }
     if (request[0] === "modify") {
       return this.modifyTask(request.splice(1));
     }
