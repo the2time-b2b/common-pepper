@@ -1,3 +1,4 @@
+const logger = require("../../../utils/logger");
 const fs = require("fs");
 const path = require("path");
 
@@ -81,7 +82,7 @@ const say = {
       taskMessage: request.join(" ")
     };
 
-    return this.updateTaskList(taskName, newTask, "create");
+    return this.updateTaskList(taskName, "create", newTask);
   },
 
   /**
@@ -93,7 +94,7 @@ const say = {
     const taskName = request.splice(0, 1);
 
     if (request.length === 1 && ["remove", "delete"].includes(request[0])) {
-      return this.updateTaskList(taskName, {}, "delete");
+      return this.updateTaskList(taskName, "delete");
     }
 
     if (
@@ -127,20 +128,25 @@ const say = {
         break;
     }
 
-    return this.updateTaskList(taskName, modifiedTask, "modify");
+    return this.updateTaskList(taskName, "modify", modifiedTask);
   },
 
   /**
   * Updates the existing task list.
-  * @param {string} taskName Name of the task.
-  * @param {Object} updatedTask A task instance.
+  * @param {String} taskName Name of the task.
   * @param {("create" | "modify" | "delete")} type Operation to be performed on
   * the on the current task list.
+  * @param {Object} updatedTask A task instance.
   */
-  updateTaskList: function(taskName, updatedTask, type) {
+  updateTaskList: function(taskName, type, updatedTask) {
     try {
       const db = fs.readFileSync(DB_PATH);
-      const [tasks] = JSON.parse(db);
+      const JSONfile = JSON.parse(db);
+
+      if (!this.validateJSON(JSONfile, ((type === "modify" ? taskName : "")))) {
+        return "Invalid Task List.";
+      }
+      const [tasks] = JSONfile;
 
       let returnedValue;
       switch (type) {
@@ -160,6 +166,7 @@ const say = {
           if (!tasks[taskName]) {
             return `The task '${taskName}' does not exists.`;
           }
+
           if (Object.keys(updatedTask).includes("named")) {
             if (taskName !== updatedTask["named"]) {
               tasks[updatedTask["named"]] = tasks[taskName];
@@ -303,6 +310,58 @@ const say = {
     if (((new Date(intervalInSeconds)).toString() === "Invalid Date")) return 0;
 
     return intervalInSeconds;
+  },
+  /**
+   * Validates local JSON database for any invalid structures.
+   * @example An example of a both a valid JSON parsing database along with
+   * proper structure:
+   * ```js
+   * [
+   *     {
+   *         "<task_name>": {
+   *             "totalWaitInterval": "<total_time_in_seconds>",
+   *             "channel": "<channel_name>",
+   *             "taskMessage": "<message>"
+   *         }...
+   *     }
+   * ]
+   * ```
+   * @param {Object} db
+   * - Parsed JSON file.
+   * - Set the value to be an empty string - `""`, if it's not to be validated.
+   * @param {String} taskName Name of the task for task specific validation.
+   */
+  validateJSON: function(db, taskName = "") {
+    const properJSONStructure = "A valid JSON structure should be of the " +
+      "format:\n[\n\t{\n\t\t\"<task name>\": {\n\t\t\t\"totalWaitInterval\"" +
+      ": <total_time_in_seconds>,\n\t\t\t\"channel\": \"<channel_name>\"," +
+      "\n\t\t\t\"taskMessage\": \"<message>\"\n\t\t}\n\t\t\"<another task " +
+      "name>\": {\n\t\t\t...\n\t\t}...\n\t}\n]";
+
+    const taskList = new RegExp(
+      "^(\\[{((\"[a-zA-Z0-9_-]{3,40}\":{((\"totalWaitInterval\":\\d+|" +
+      "\"channel\":\"[a-zA-Z0-9_]{4,25}\"|\"taskMessage\":\"([^\"]*)\"" +
+      "),){2}(\"totalWaitInterval\":\\d+|\"channel\":\"[a-zA-Z0-9_]{4,25}" +
+      "\"|\"taskMessage\":\"([^\"]*)\")},){0,}(\"[a-zA-Z0-9_-]{3,40}\":{(((\"" +
+      "totalWaitInterval\":\\d+|\"channel\":\"[a-zA-Z0-9_]{4,25}\"|\"" +
+      "taskMessage\":\"([^\"]*)\"),){2}(\"totalWaitInterval\":\\d+|\"channel" +
+      "\":\"[a-zA-Z0-9_]{4,25}\"|\"taskMessage\":\"([^\"]*)\"))}))*}\\])$"
+    );
+    if (JSON.stringify(db).match(taskList)) return true;
+
+    if (taskName) {
+      const [tasks] = db;
+      if (tasks[taskName] && Object.keys(tasks[taskName]).length !== 3) {
+        console.error(
+          "\n\x1b[31m%s\x1b[0m",
+          `Unnecessary/missing attribute for the task '${taskName[0]}':`
+        );
+        console.error("\n\x1b[31m%s\x1b[0m", tasks[taskName]);
+        logger.info();
+      }
+    }
+    logger.info("\x1b[34m%s\x1b[0m", properJSONStructure);
+    return false;
   }
 };
 

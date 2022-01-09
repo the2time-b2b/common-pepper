@@ -2,6 +2,7 @@ const fs = require("fs");
 
 const { onMessageHandler, configProps } = require("../../common-pepper");
 const { user: userEntitity } = require("../context");
+const testSets = require("./test-sets/say.json");
 const { say, DB_PATH } = require("../../commands/main/say/index");
 const { toBe } = require("../helper");
 
@@ -12,13 +13,6 @@ describe("The 'say' command should", () => {
   const cmdName = `${configProps.PREFIX}say `;
 
   beforeEach(() => {
-    configProps.PREFIX = process.env.PREFIX;
-    configProps.SEND_INTERVAL = process.env.SEND_INTERVAL || "30";
-    configProps.SEND_INTERVAL = parseInt(configProps.SEND_INTERVAL);
-    configProps.DUPMSG_CHAR = process.env.DUPMSG_CHAR;
-    configProps.LAST_SENT = Date.now();
-    configProps.DUPMSG_STATUS = null;
-
     fs.writeFileSync(DB_PATH, JSON.stringify([{}], null, 4));
   });
 
@@ -29,28 +23,23 @@ describe("The 'say' command should", () => {
   });
 
   test("accept a well-crafted request", () => {
-    const commandList = [
-      "this is a test message every 1:0:0 on channel named task-name",
-      "this is a another test message every 30:0 on channel named task-name2",
-      "this is a yet another test message every 60 on channel named task-name3"
-    ];
     const totalWaitIntervalList = [
       1 * 60 * 60,
       30 * 60,
       60
     ];
 
-    for (let i = 0; i < commandList.length; i++) {
+    for (let i = 0; i < testSets.validCommandList.length; i++) {
       let db = fs.readFileSync(DB_PATH);
       let [tasks] = JSON.parse(db);
       expect(Object.keys(tasks)).toHaveLength(i);
 
-      const cmdParts = commandList[i].split(" ");
+      const cmdParts = testSets.validCommandList[i].split(" ");
       const taskName = cmdParts[cmdParts.length - 1];
       const channel = cmdParts[cmdParts.length - 3];
       const sayMessage = cmdParts
         .splice(0, cmdParts.indexOf("every")).join(" ");
-      const args = [context, cmdName + commandList[i], self];
+      const args = [context, cmdName + testSets.validCommandList[i], self];
       const client = toBe(
         target,
         `Task ${taskName} activated on channel ${channel.toLowerCase()}.`
@@ -74,10 +63,7 @@ describe("The 'say' command should", () => {
   });
 
   test("return command usage information", () => {
-    const commandInfoList = [
-      "help", "usage", "modify", "example", "message", "channel"
-    ];
-    commandInfoList.forEach(meta => {
+    testSets.commandInfoList.forEach(meta => {
       const args = [
         context, context["display-name"] + ", " + cmdName + meta, self
       ];
@@ -88,18 +74,8 @@ describe("The 'say' command should", () => {
   });
 
   test("display the command usage format for badly formatted commands", () => {
-    const invalidCommandList = [
-      "every 1:0:0 on channel named task-name",
-      "this is a test message",
-      "every 1:0:0",
-      "on channel",
-      "named task-name",
-      "this is a test message every on named",
-      "every on named",
-    ];
-
-    for (let i = 0; i < invalidCommandList.length; i++) {
-      const args = [context, cmdName + invalidCommandList[i], self];
+    for (let i = 0; i < testSets.invalidCommandList.length; i++) {
+      const args = [context, cmdName + testSets.invalidCommandList[i], self];
       const client = toBe(target, say.usage);
 
       onMessageHandler(client, target, ...args);
@@ -114,16 +90,6 @@ describe("The 'say' command should", () => {
       "named": "Task names should only contain alphanumerics, hyphens and" +
         " underscores, ranging from 3-50 characters only."
     };
-    const invalidIntervalList = [
-      "1:0:0:0", "a:b:c", "-1:0:0", "1:0:b", "1.5:0:0", ":::", "1::",
-      "1:0:", ":", "1:0:0:"
-    ];
-    const invalidChannelList = [
-      "jim", "justin-tv", "thisis26chartwitchusername"
-    ];
-    const invalidTaskNameList = [
-      "hi", "thisisaunnecessaryforty1charactertaskname"
-    ];
 
     for (const type in mismatchTypeResultPair) {
       test(`For the ${type}`, () => {
@@ -131,17 +97,17 @@ describe("The 'say' command should", () => {
         switch (type) {
           case "every":
             cmdPart1 = "test message every ";
-            cmdPart2 = invalidIntervalList;
+            cmdPart2 = testSets.invalidIntervalList;
             cmdPart3 = " on testChannel named task-name";
             break;
           case "on":
             cmdPart1 = "test message every 1:0:0 on ";
-            cmdPart2 = invalidChannelList;
+            cmdPart2 = testSets.invalidChannelList;
             cmdPart3 = " named task-name";
             break;
           case "named":
             cmdPart1 = "test message every 1:0:0 on testChannel named ";
-            cmdPart2 = invalidTaskNameList;
+            cmdPart2 = testSets.invalidTaskNameList;
             cmdPart3 = "";
             break;
         }
@@ -167,9 +133,9 @@ describe("The 'say' command should", () => {
       onMessageHandler(client, target, ...args);
 
       const invalidCommandPartList = {
-        every: invalidIntervalList,
-        on: invalidChannelList,
-        named: invalidTaskNameList
+        every: testSets.invalidIntervalList,
+        on: testSets.invalidChannelList,
+        named: testSets.invalidTaskNameList
       };
 
       Object.keys(invalidCommandPartList).forEach(modifiedType => {
@@ -275,13 +241,7 @@ describe("The 'say' command should", () => {
 
     onMessageHandler(client, target, ...args);
 
-    const commandList = [
-      "modify task-name",
-      "modify task-name say",
-      "modify task-name every",
-      "modify task-name on",
-      "modify task-name named"
-    ];
+    const commandList = testSets.invalidModifyCommandList;
 
     commandList.forEach(type => {
       command = cmdName + type;
@@ -320,7 +280,7 @@ describe("The 'say' command should", () => {
     let [tasks] = JSON.parse(db);
     expect(Object.keys(tasks)).toHaveLength(1);
 
-    command = `${configProps.PREFIX}say modify task-name delete`;
+    command = cmdName + "modify task-name delete";
     args = [context, command, self];
     client = toBe(target, "Task task-name successfully removed.");
 
@@ -331,6 +291,15 @@ describe("The 'say' command should", () => {
     expect(Object.keys(tasks)).toHaveLength(0);
   });
 
+  test("allow users to clear the JSON database", () => {
+    const command = cmdName + "clear task list";
+    const args = [context, command, self];
+    const client = toBe(target, "The task list has been wiped clean.");
+    onMessageHandler(client, target, ...args);
+
+    const db = fs.readFileSync(DB_PATH);
+    expect(JSON.parse(db)).toEqual([{}]);
+  });
 
   describe("handle JSON database error where", () => {
     test("there is an invalid JSON format", () => {
@@ -343,7 +312,7 @@ describe("The 'say' command should", () => {
       };
 
       const func = jest.spyOn(console, "error");
-      say.updateTaskList("task-name", newTask, "create");
+      say.updateTaskList("task-name", "create", newTask);
       expect(func).toHaveBeenCalledWith(
         "Unexpected token } in JSON at position 3 for the file in path: "
         + DB_PATH
@@ -359,21 +328,25 @@ describe("The 'say' command should", () => {
         taskMessage: "test message"
       };
 
-      const func = jest.spyOn(console, "error");
-      say.updateTaskList("task-name", newTask, "create");
-      expect(func).toHaveBeenCalledWith(
+      const errorLog = jest.spyOn(console, "error");
+      say.updateTaskList("task-name", "create", newTask);
+      expect(errorLog).toHaveBeenCalledWith(
         `ENOENT: no such file or directory, open '${DB_PATH}'`
       );
     });
 
-    test("allow users to clear the JSON database", () => {
-      const command = cmdName + "clear task list";
-      const args = [context, command, self];
-      const client = toBe(target, "The task list has been wiped clean.");
-      onMessageHandler(client, target, ...args);
+    describe("handle manual changes to JSOB DB directly where", () => {
+      test("the entire task list is improperly structured", () => {
+        testSets.invalidTaskListStructs.forEach(invalidTaskList => {
+          fs.writeFileSync(DB_PATH, JSON.stringify(invalidTaskList, null, 2));
+          const command = cmdName +
+            "modify task-name say another test message";
+          const args = [context, command, self];
+          const client = toBe(target, "Invalid Task List.");
 
-      const db = fs.readFileSync(DB_PATH);
-      expect(JSON.parse(db)).toEqual([{}]);
+          onMessageHandler(client, target, ...args);
+        });
+      });
     });
   });
 
