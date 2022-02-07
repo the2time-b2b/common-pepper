@@ -15,7 +15,7 @@ module.exports = {
     "camelcase": "error",
     "capitalized-comments": "error",
     "eqeqeq": "error",
-    "max-len": "error",
+    "max-len": ["error", { "ignoreRegExpLiterals": true }],
     "no-debugger": "error",
     "no-multi-spaces": "error",
     "no-duplicate-imports": "error",

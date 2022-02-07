@@ -2,7 +2,7 @@ const fs = require("fs");
 
 const { onMessageHandler, configProps } = require("../../common-pepper");
 const { user: userEntitity } = require("../context");
-const testSets = require("./test-sets/say.json");
+const testSets = require("./test-sets/say");
 const { say, DB_PATH } = require("../../commands/main/say/index");
 const { toBe } = require("../helper");
 
