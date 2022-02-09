@@ -1,6 +1,6 @@
 const { configProps } = require("../common-pepper");
 const entities = require("./context");
-const { mimicMessageEventByBot, testFunctionCallStatus } = require("./helper");
+const { testFunctionCallStatus } = require("./helper");
 
 
 describe("Message handler should", () => {
@@ -46,59 +46,5 @@ describe("Message handler should", () => {
 
       testFunctionCallStatus(context, msg, self, "notToBeCalled");
     });
-  });
-
-
-  describe("circumvent message duplication filter where,", () => {
-    const user = entities.user;
-    const msg = `${configProps.PREFIX}testCmd same message from the user`;
-    const filterByPassChar = "\udb40\udc00";
-
-    it("it responds to initial user request unaltered", () => {
-      testFunctionCallStatus(user.context, msg, user.self, "toBeCalled");
-    });
-
-
-    it("it circumvents the next immediate user request", () => {
-      // Set SEND_INTERVAL to 0; chat cooldown prevention interferes with test
-      mimicMessageEventByBot(true);
-      configProps.SEND_INTERVAL = 0;
-
-      testFunctionCallStatus(
-        user.context, msg, user.self, "toBeCalled", `${msg} ${filterByPassChar}`
-      );
-    });
-  });
-
-
-  describe("watch the set SEND_INTERVAL value and", () => {
-    const user = entities.user;
-    const msg = `${configProps.PREFIX}testCmd same message from the user`;
-
-    const initialTimeElapsed = 5; // In sec
-    const finalTimeElapsed = 15; // In sec
-
-    beforeEach(() => configProps.SEND_INTERVAL = 20); // In sec
-    jest.useFakeTimers();
-
-    it("it should respond for every initial user request", () => {
-      testFunctionCallStatus(user.context, msg, user.self, "toBeCalled");
-    });
-
-    jest.advanceTimersByTime(initialTimeElapsed * 1000);
-
-    it("it should not respond if elapsed time is less than set value", () => {
-      mimicMessageEventByBot();
-
-      testFunctionCallStatus(user.context, msg, user.self, "notToBeCalled");
-    });
-
-    jest.advanceTimersByTime(finalTimeElapsed * 1000);
-
-    it("it should respond if elapsed time is greater than set value", () => {
-      testFunctionCallStatus(user.context, msg, user.self, "toBeCalled");
-    });
-
-    jest.useRealTimers();
   });
 });

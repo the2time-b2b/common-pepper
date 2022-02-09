@@ -33,7 +33,8 @@
   "homepage": "https://github.com/pysudo/common-pepper#readme",
   "dependencies": {
     "dotenv": "^10.0.0",
-    "tmi.js": "^1.8.5"
+    "tmi.js": "^1.8.5",
+    "toad-scheduler": "^1.6.0"
   },
   "devDependencies": {
     "@types/jest": "^27.0.2",
