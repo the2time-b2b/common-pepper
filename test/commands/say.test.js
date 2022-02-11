@@ -1,6 +1,6 @@
 const fs = require("fs");
 
-const { onMessageHandler, configProps } = require("../../common-pepper");
+const { onMessageHandler } = require("../../common-pepper");
 const { user: userEntitity } = require("../context");
 const testSets = require("./test-sets/say");
 const { say, DB_PATH } = require("../../commands/main/say/index");
@@ -10,7 +10,7 @@ const { toBe } = require("../helper");
 describe("The 'say' command should", () => {
   const { context, self } = userEntitity;
   const target = "#sven_snusberg";
-  const cmdName = `${configProps.PREFIX}say `;
+  const cmdName = `${process.env.PREFIX}say `;
 
   beforeEach(() => {
     fs.writeFileSync(DB_PATH, JSON.stringify([{}], null, 4));

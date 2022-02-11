@@ -1,4 +1,4 @@
-const { onMessageHandler, configProps } = require("../common-pepper");
+const { onMessageHandler } = require("../common-pepper");
 
 
 /**
@@ -24,22 +24,6 @@ function toBe(expectedTarget, expectedResponse) {
 
 
 /**
-* Mimic an 'on message' event triggered by the bot itself to change the state of
-* DUPMSG_STATUS from null to either '0' or '1'.
-* @param {boolean} [circumvented=false] Response circumvents message duplication
-* filter.
-*/
-function mimicMessageEventByBot(circumvented = false) {
-  if (!circumvented) {
-    configProps.DUPMSG_STATUS = "0";
-  }
-  else {
-    configProps.DUPMSG_STATUS = "1";
-  }
-}
-
-
-/**
  * Check if the bot responds to user's request.
  * @param {Object} context Metadata about the entity who initiated the request.
  * @param {string} cmd User request.
@@ -61,8 +45,4 @@ function testFunctionCallStatus(context, cmd, self, type, response = null) {
 }
 
 
-module.exports = {
-  toBe,
-  mimicMessageEventByBot,
-  testFunctionCallStatus
-};
+module.exports = { toBe, testFunctionCallStatus };

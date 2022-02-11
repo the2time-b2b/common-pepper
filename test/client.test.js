@@ -1,7 +1,5 @@
-const {
-  bypassDuplicateMessageFilter, configProps
-} = require("../common-pepper");
-const { mimicMessageEventByBot } = require("./helper");
+const Client = require("../lib/client");
+const Channel = require("../lib/channel");
 
 
 // Dummy options
@@ -12,33 +10,29 @@ const opts = {
   },
   channels: []
 };
-const client = new bypassDuplicateMessageFilter(opts);
-const message = `${configProps.PREFIX}testCmd same message from the user`;
+const client = new Client(opts);
+const message = `${process.env.PREFIX}testCmd same message from the user`;
 const channel = "#sven_snusberg";
 const filterByPassChar = "\udb40\udc00";
 const infoLog = jest.spyOn(console, "info");
 
 beforeEach(() => {
-  configProps.PREFIX = process.env.PREFIX;
-  configProps.SEND_INTERVAL = process.env.SEND_INTERVAL || "30";
-  configProps.SEND_INTERVAL = parseInt(configProps.SEND_INTERVAL);
-  configProps.DUPMSG_CHAR = process.env.DUPMSG_CHAR;
-  configProps.LAST_SENT = Date.now();
-  configProps.DUPMSG_STATUS = null;
+  client.SEND_INTERVAL = process.env.SEND_INTERVAL || "30";
+  client.SEND_INTERVAL = parseInt(client.SEND_INTERVAL);
+  client.DUPMSG_CHAR = process.env.DUPMSG_CHAR;
 
+  Channel.clearChannels();
   jest.clearAllMocks();
 });
 
 describe("circumvent message duplication filter where,", () => {
-  it("it responds to initial user request unaltered", () => {
+  it("it circumvents the alternate user requests", () => {
     client.say(channel, message);
     expect(infoLog).toHaveBeenCalledWith({ channel, message });
-  });
 
-  it("it circumvents the next immediate user request", () => {
+    jest.clearAllMocks();
     // Set SEND_INTERVAL to 0; chat cooldown prevention interferes with test
-    mimicMessageEventByBot(true);
-    configProps.SEND_INTERVAL = 0;
+    client.SEND_INTERVAL = 0;
 
     client.say(channel, message);
     expect(infoLog).toHaveBeenCalledWith({
@@ -50,11 +44,10 @@ describe("circumvent message duplication filter where,", () => {
 
 describe("watch the set SEND_INTERVAL value and respond if", () => {
   beforeAll(() => jest.useFakeTimers());
-  afterAll(() => jest.useRealTimers());
 
   it("elapsed time is more than set value except for initial request", () => {
     // In seconds
-    configProps.SEND_INTERVAL = 20;
+    client.SEND_INTERVAL = 20;
     const initialTimeElapsed = 5;
     const finalTimeElapsed = 15;
 
@@ -74,4 +67,6 @@ describe("watch the set SEND_INTERVAL value and respond if", () => {
     expect(infoLog)
       .toBeCalledWith({ channel, message: `${message} ${filterByPassChar}` });
   });
+
+  afterAll(() => jest.useRealTimers());
 });

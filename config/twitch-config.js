@@ -5,6 +5,6 @@ module.exports = {
     password: process.env.BOT_TOKEN
   },
   channels: [
-    process.env.CHANNEL_NAME
+    process.env.CHANNEL
   ]
 };

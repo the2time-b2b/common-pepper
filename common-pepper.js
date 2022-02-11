@@ -1,57 +1,13 @@
-require("dotenv").config();
-const tmi = require("tmi.js");
-
+const Client = require("./lib/client");
 const { opts } = require("./config");
 const logger = require("./utils/logger");
 const { execCmd } = require("./commands/helper");
 
 
-const configProps = {
-  PREFIX: process.env.PREFIX,
-  SEND_INTERVAL: process.env.SEND_INTERVAL || 30,
-  DUPMSG_CHAR: process.env.DUPMSG_CHAR,
-  LAST_SENT: Date.now(),
-  DUPMSG_STATUS: null // Set to null to indicate first bot message after reset
-};
-
-
-/**
- * Circumvents Twitch's duplicate message filter
- */
-class bypassDuplicateMessageFilter extends tmi.client {
-  say(channel, message) {
-    const nodeEnv = process.env.NODE_ENV || "dev";
-    const dupMsgChar = configProps.DUPMSG_CHAR;
-    const dupMsgStatus = configProps.DUPMSG_STATUS;
-    const lastSent = configProps.LAST_SENT;
-    const sendInterval = parseInt(configProps.SEND_INTERVAL);
-
-    if (dupMsgStatus === "1" && nodeEnv !== "dev") {
-      message += ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
-    }
-
-    /*
-    * Prevents intentional/unintentional global cooldown
-    * DUPMSG_STATUS initially set to null for first bot's message after reset
-    */
-    const diff = ((Date.now() - lastSent) / 1000);
-    if ((diff >= sendInterval) || dupMsgStatus === null) {
-      if (["dev", "test"].includes(nodeEnv)) logger.info({ channel, message });
-      else super.say(channel, message);
-
-      configProps.LAST_SENT = Date.now();
-      // TODO: Seperate DUPMSG_STATUS instance on each individual channel.
-      configProps.DUPMSG_STATUS = dupMsgStatus === "1" ? "0" : "1";
-
-    }
-  }
-}
-
-
 try {
   if (process.env.NODE_ENV !== "test") {
     // Create a client with our options
-    const client = new bypassDuplicateMessageFilter(opts);
+    const client = new Client(opts);
 
     client.on("message", function() {
       onMessageHandler(client, ...arguments);
@@ -66,7 +22,7 @@ catch (err) { console.error(err); }
 
 function onMessageHandler(client, target, context, msg, self) {
   const nodeEnv = process.env.NODE_ENV || "dev";
-  const prefix = configProps.PREFIX;
+  const prefix = process.env.PREFIX;
   const prefixLength = prefix.length;
 
   // Ignore messages from the bot
@@ -103,6 +59,4 @@ function onConnectedHandler(addr, port) {
 }
 
 
-module.exports = {
-  bypassDuplicateMessageFilter, onMessageHandler, configProps
-};
+module.exports = { onMessageHandler };
