@@ -1,5 +1,6 @@
+const { onMessageHandler } = require("../common-pepper");
 const entities = require("./context");
-const { testFunctionCallStatus } = require("./helper");
+const { toBe } = require("./helper");
 
 
 describe("Message handler should", () => {
@@ -37,3 +38,25 @@ describe("Message handler should", () => {
     });
   });
 });
+
+
+/**
+ * Check if the bot responds to user's request.
+ * @param {Object} context Metadata about the entity who initiated the request.
+ * @param {string} cmd User request.
+ * @param {boolean} self Indicates whether request is bot initiated.
+ * @param {("toBeCalled" | "notToBeCalled")} type {typeValues} Expect `say`
+ * method to be called or not.
+ * @param {string} response Expected bot response.
+ */
+function testFunctionCallStatus(context, cmd, self, type, response = null) {
+  const target = "#sven_snusberg";
+
+  const client = toBe(target, (response ? response : cmd));
+  const say = jest.spyOn(client, "say");
+
+  onMessageHandler(client, target, context, cmd, self);
+
+  if (type === "toBeCalled") expect(say).toBeCalled();
+  if (type === "notToBeCalled") expect(say).not.toBeCalled();
+}

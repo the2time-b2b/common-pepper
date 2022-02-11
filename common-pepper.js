@@ -20,7 +20,7 @@ try {
 catch (err) { console.error(err); }
 
 
-function onMessageHandler(client, target, context, msg, self) {
+async function onMessageHandler(client, target, context, msg, self) {
   const nodeEnv = process.env.NODE_ENV || "dev";
   const prefix = process.env.PREFIX;
   const prefixLength = prefix.length;
@@ -46,9 +46,16 @@ function onMessageHandler(client, target, context, msg, self) {
   logger.info(`\n* Raw request "${command}" Received`);
 
   if (response) {
-    logger.info(`* Executed "${request.join(" ")}" command`);
+    try {
+      await client.say(target, response);
+      logger.info(`* Executed "${request.join(" ")}" command`);
+    }
+    catch (err) {
+      if (err.name !== "sendIntervalError") {
+        console.error(err);
+      }
+    }
 
-    client.say(target, response);
   }
   else logger.info(`* Unknown command ${request.join(" ")}`);
 }

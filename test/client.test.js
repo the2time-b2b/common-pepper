@@ -14,7 +14,6 @@ const client = new Client(opts);
 const message = `${process.env.PREFIX}testCmd same message from the user`;
 const channel = "#sven_snusberg";
 const filterByPassChar = "\udb40\udc00";
-const infoLog = jest.spyOn(console, "info");
 
 beforeEach(() => {
   client.SEND_INTERVAL = process.env.SEND_INTERVAL || "30";
@@ -26,18 +25,14 @@ beforeEach(() => {
 });
 
 describe("circumvent message duplication filter where,", () => {
-  it("it circumvents the alternate user requests", () => {
-    client.say(channel, message);
-    expect(infoLog).toHaveBeenCalledWith({ channel, message });
+  it("it circumvents the alternate user requests", async() => {
 
-    jest.clearAllMocks();
+    testClientResponse(channel, message);
+
     // Set SEND_INTERVAL to 0; chat cooldown prevention interferes with test
     client.SEND_INTERVAL = 0;
 
-    client.say(channel, message);
-    expect(infoLog).toHaveBeenCalledWith({
-      channel, message: `${message} ${filterByPassChar}`
-    });
+    testClientResponse(channel, message, true);
   });
 });
 
@@ -51,22 +46,36 @@ describe("watch the set SEND_INTERVAL value and respond if", () => {
     const initialTimeElapsed = 5;
     const finalTimeElapsed = 15;
 
-    client.say(channel, message);
-    expect(infoLog).toBeCalledWith({ channel, message });
-    jest.clearAllMocks();
+    testClientResponse(channel, message);
 
     jest.advanceTimersByTime(initialTimeElapsed * 1000); // Advances to 5 secs.
 
-    client.say(channel, message);
-    expect(infoLog).not.toBeCalled();
-    jest.clearAllMocks();
+    testClientResponse(channel, message, true);
 
     jest.advanceTimersByTime(finalTimeElapsed * 1000); // Advances to 20 secs.
 
-    client.say(channel, message);
-    expect(infoLog)
-      .toBeCalledWith({ channel, message: `${message} ${filterByPassChar}` });
+    testClientResponse(channel, message, `${message} ${filterByPassChar}`);
   });
 
   afterAll(() => jest.useRealTimers());
 });
+
+
+/**
+ * Test the client instance response.
+ * @param {string} channel - Recipient channel.
+ * @param {string} message - A response message.
+ * @param {boolean} circumvented - Expect a duplication filter circumvented
+ * response.
+ */
+function testClientResponse(channel, message, circumvented = false) {
+  client.say(channel, message)
+    .then(response => {
+      expect(response).toHaveLength(2);
+      const [returnedChannel, returnedMessage] = response;
+      expect(returnedChannel).toBe(channel);
+      expect(returnedMessage)
+        .toBe(circumvented ? `${message} ${filterByPassChar}` : message);
+    })
+    .catch(err => expect(err.name).toBe("sendIntervalError"));
+}
