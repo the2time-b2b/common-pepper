@@ -16,45 +16,47 @@ const channel = "#sven_snusberg";
 const filterByPassChar = "\udb40\udc00";
 
 beforeEach(() => {
-  client.SEND_INTERVAL = process.env.SEND_INTERVAL || "30";
-  client.SEND_INTERVAL = parseInt(client.SEND_INTERVAL);
-  client.DUPMSG_CHAR = process.env.DUPMSG_CHAR;
-
   Channel.clearChannels();
   jest.clearAllMocks();
 });
 
-describe("circumvent message duplication filter where,", () => {
-  it("it circumvents the alternate user requests", async() => {
+describe("circumvent message duplication filter where bypass interval,", () => {
+  // Set SEND_INTERVAL to 0; chat cooldown prevention interferes with test
+  client.SEND_INTERVAL = 0;
 
-    testClientResponse(channel, message);
+  it("is greater than the elapsed time for consecutive requests", async() => {
+    await testClientResponse();
 
-    // Set SEND_INTERVAL to 0; chat cooldown prevention interferes with test
-    client.SEND_INTERVAL = 0;
+    await testClientResponse(true);
+  });
 
-    testClientResponse(channel, message, true);
+  it("is lesser than the elapsed time for consecutive requests", async() => {
+    jest.useFakeTimers();
+
+    await testClientResponse();
+
+    jest.advanceTimersByTime(31000); // Advances to 30 secs.
+
+    await testClientResponse();
+
+    jest.useRealTimers();
   });
 });
 
 
 describe("watch the set SEND_INTERVAL value and respond if", () => {
-  beforeAll(() => jest.useFakeTimers());
+  beforeAll(() => { jest.useFakeTimers(); client.SEND_INTERVAL = 20; });
 
-  it("elapsed time is more than set value except for initial request", () => {
-    // In seconds
-    client.SEND_INTERVAL = 20;
-    const initialTimeElapsed = 5;
-    const finalTimeElapsed = 15;
+  it("elapsed time is more than set value for consecutive request", async() => {
+    await testClientResponse();
 
-    testClientResponse(channel, message);
+    jest.advanceTimersByTime(5000); // Advances to 5 secs.
 
-    jest.advanceTimersByTime(initialTimeElapsed * 1000); // Advances to 5 secs.
+    await testClientResponse(false, true);
 
-    testClientResponse(channel, message, true);
+    jest.advanceTimersByTime(15000); // Advances to 20 secs.
 
-    jest.advanceTimersByTime(finalTimeElapsed * 1000); // Advances to 20 secs.
-
-    testClientResponse(channel, message, `${message} ${filterByPassChar}`);
+    await testClientResponse(true);
   });
 
   afterAll(() => jest.useRealTimers());
@@ -63,19 +65,26 @@ describe("watch the set SEND_INTERVAL value and respond if", () => {
 
 /**
  * Test the client instance response.
- * @param {string} channel - Recipient channel.
- * @param {string} message - A response message.
- * @param {boolean} circumvented - Expect a duplication filter circumvented
- * response.
+ * @param {boolean} [circumvented=false] - Expect a duplication filter
+ * circumvented response.
+ * @param {boolean} [rejection=false] - Test for promise rejections.
  */
-function testClientResponse(channel, message, circumvented = false) {
-  client.say(channel, message)
-    .then(response => {
-      expect(response).toHaveLength(2);
-      const [returnedChannel, returnedMessage] = response;
-      expect(returnedChannel).toBe(channel);
-      expect(returnedMessage)
-        .toBe(circumvented ? `${message} ${filterByPassChar}` : message);
-    })
-    .catch(err => expect(err.name).toBe("sendIntervalError"));
+async function testClientResponse(circumvented = false, rejection = false) {
+  let response;
+
+  try {
+    response = await client.say(channel, message);
+  }
+  catch (err) {
+    if (rejection) {
+      expect(err.name).toBe("sendIntervalError");
+      return;
+    }
+  }
+
+  expect(response).toHaveLength(2);
+  const [returnedChannel, returnedMessage] = response;
+  expect(returnedChannel).toBe(channel);
+  expect(returnedMessage)
+    .toBe(circumvented ? `${message} ${filterByPassChar}` : message);
 }
