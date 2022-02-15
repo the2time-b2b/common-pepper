@@ -47,8 +47,9 @@ async function onMessageHandler(client, target, context, msg, self) {
 
   if (response) {
     try {
-      await client.say(target, response);
+      const [channel, message] = await client.say(target, response);
       logger.info(`* Executed "${request.join(" ")}" command`);
+      logger.info("* Details:", { channel, message });
     }
     catch (err) {
       if (err.name !== "sendIntervalError") {
