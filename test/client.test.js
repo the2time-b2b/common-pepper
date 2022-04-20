@@ -11,52 +11,65 @@ const opts = {
   channels: []
 };
 const client = new Client(opts);
-const message = `${process.env.PREFIX}testCmd same message from the user`;
-const channel = "#sven_snusberg";
-const filterByPassChar = "\udb40\udc00";
 
 beforeEach(() => {
+  client.SEND_INTERVAL = 0; // Preset cooldown prevention interferes with test.
+
   Channel.clearChannels();
   jest.clearAllMocks();
 });
 
 describe("circumvent message duplication filter where bypass interval,", () => {
-  // Set SEND_INTERVAL to 0; chat cooldown prevention interferes with test
-  client.SEND_INTERVAL = 0;
+  const message = `${process.env.PREFIX}testCmd same message from the user`;
 
   it("is greater than the elapsed time for consecutive requests", async() => {
-    await testClientResponse();
+    await testClientResponse(message);
 
-    await testClientResponse(true);
+    await testClientResponse(message, true);
   });
 
   it("is lesser than the elapsed time for consecutive requests", async() => {
-    jest.useFakeTimers();
+    jest.useFakeTimers(message);
 
-    await testClientResponse();
+    await testClientResponse(message);
 
     jest.advanceTimersByTime(31000); // Advances to 30 secs.
 
-    await testClientResponse();
+    await testClientResponse(message);
 
-    jest.useRealTimers();
+    jest.useRealTimers(message);
+  });
+});
+
+
+describe("do not circumvent message duplication filter", () => {
+  let message = `${process.env.PREFIX}testCmd same message from the user`;
+
+  it("for different requests", async() => {
+    await testClientResponse(message);
+
+    message = `${process.env.PREFIX}testCmd different message from the user`;
+    await testClientResponse(message);
   });
 });
 
 
 describe("watch the set SEND_INTERVAL value and respond if", () => {
-  beforeAll(() => { jest.useFakeTimers(); client.SEND_INTERVAL = 20; });
+  const message = `${process.env.PREFIX}testCmd same message from the user`;
+  beforeAll(() => { jest.useFakeTimers(); });
 
   it("elapsed time is more than set value for consecutive request", async() => {
-    await testClientResponse();
+    client.SEND_INTERVAL = 20;
+
+    await testClientResponse(message);
 
     jest.advanceTimersByTime(5000); // Advances to 5 secs.
 
-    await testClientResponse(false, true);
+    await testClientResponse(message, false, true);
 
     jest.advanceTimersByTime(15000); // Advances to 20 secs.
 
-    await testClientResponse(true);
+    await testClientResponse(message, true);
   });
 
   afterAll(() => jest.useRealTimers());
@@ -65,11 +78,17 @@ describe("watch the set SEND_INTERVAL value and respond if", () => {
 
 /**
  * Test the client instance response.
+ * @param {string} message - A response message.
  * @param {boolean} [circumvented=false] - Expect a duplication filter
  * circumvented response.
  * @param {boolean} [rejection=false] - Test for promise rejections.
  */
-async function testClientResponse(circumvented = false, rejection = false) {
+async function testClientResponse(
+  message, circumvented = false, rejection = false
+) {
+  const channel = "#sven_snusberg";
+  const filterByPassChar = "\udb40\udc00";
+
   let response;
 
   try {
