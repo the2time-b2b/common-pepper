@@ -19,6 +19,13 @@ describe("Message handler should", () => {
       testFunctionCallStatus(context, msg, self, "notToBeCalled");
     });
 
+    it("ignores unknown commands", () => {
+      const { context, self } = entities.user;
+      const msg = "someRandomCommand test message from the user";
+
+      testFunctionCallStatus(context, msg, self, "notToBeCalled");
+    });
+
     test("replace multiple whitespaces with a single whitespace", () => {
       const { context, self } = entities.user;
       const expectedMsg = `${process.env.PREFIX}testCmd test message from user`;

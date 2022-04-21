@@ -1,8 +1,14 @@
 const Client = require("./lib/client");
-const { opts } = require("./config");
+const Queue = require("./lib/queue");
+const execCmd = require("./lib/command");
+const clientResponse = require("./lib/response");
+const listner = require("./lib/listner");
 const logger = require("./utils/logger");
-const { execCmd } = require("./commands/helper");
+const { opts } = require("./config");
 
+
+const responseQueue = new Queue();
+const botResponseStatus = { status: 0 };
 
 try {
   if (process.env.NODE_ENV !== "test") {
@@ -15,13 +21,30 @@ try {
     client.on("connected", onConnectedHandler);
 
     client.connect();
+
+    listner(new Client(opts), responseQueue, botResponseStatus);
+
+    setInterval(() => {
+      if (responseQueue.isEmpty()) return;
+
+      const latestResponse = responseQueue.retrieve();
+      const request = latestResponse.request;
+      const target = latestResponse.target;
+      const commandResponse = latestResponse.commandResponse;
+      clientResponse(client, request, target, commandResponse);
+
+      if (botResponseStatus.status === 1) {
+        botResponseStatus.status = 0;
+        logger.info(`* Executed "${request.join(" ")}" command`);
+        logger.info("* Details:", { target, commandResponse });
+      }
+    }, 1000); // TODO: Dynamically change polling interval via commands
   }
 }
 catch (err) { console.error(err); }
 
 
-async function onMessageHandler(client, target, context, msg, self) {
-  const nodeEnv = process.env.NODE_ENV || "dev";
+function onMessageHandler(client, target, context, msg, self) {
   const prefix = process.env.PREFIX;
   const prefixLength = prefix.length;
 
@@ -37,28 +60,25 @@ async function onMessageHandler(client, target, context, msg, self) {
   *whitespaces, tabs or newlines between words with just one whitespace
   */
   const request = command.trim().replace(/\s\s+/g, " ").split(" ");
-
-  // Command with name testCmd reserved for test only.
-  const response = (request[0] === `${prefix}testCmd` && nodeEnv === "test")
-    ? request.join(" ")
-    : execCmd(context, request);
-
   logger.info(`\n* Raw request "${command}" Received`);
 
-  if (response) {
-    try {
-      const [channel, message] = await client.say(target, response);
-      logger.info(`* Executed "${request.join(" ")}" command`);
-      logger.info("* Details:", { channel, message });
-    }
-    catch (err) {
-      if (err.name !== "sendIntervalError") {
-        console.error(err);
-      }
-    }
-
+  const commandResponse = execCmd(prefix, context, request);
+  if (!commandResponse) {
+    logger.info(`* Unknown command ${request.join(" ")}`);
+    return;
   }
-  else logger.info(`* Unknown command ${request.join(" ")}`);
+
+  /*
+    Note: Introduction of response queues breaks current message handler test
+    as 'say' member function is called seperately every set interval.
+  */
+  // TODO: Alter test to reflect the changes introduced due to response queues.
+  if (process.env.NODE_ENV === "test") {
+    clientResponse(client, request, target, commandResponse);
+    return;
+  }
+
+  responseQueue.enquqe({ request, target, commandResponse });
 }
 
 
