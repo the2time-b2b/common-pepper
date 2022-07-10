@@ -1,10 +1,15 @@
+require("dotenv").config();
+
 const fs = require("fs");
 
-const { onMessageHandler } = require("../../common-pepper");
+const { clientHandlers } = require("../../utils/handlers");
 const { user: userEntitity } = require("../context");
 const testSets = require("./test-sets/say");
 const { say, DB_PATH } = require("../../commands/main/say/index");
 const { toBe } = require("../helper");
+
+
+const onMessageHandler = clientHandlers.onMessageHandler;
 
 
 describe("The 'say' command should", () => {

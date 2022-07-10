@@ -1,4 +1,7 @@
-const { onMessageHandler } = require("../common-pepper");
+require("dotenv").config();
+
+const { clientHandlers } = require("../utils/handlers");
+
 const entities = require("./context");
 const { toBe } = require("./helper");
 
@@ -62,7 +65,7 @@ function testFunctionCallStatus(context, cmd, self, type, response = null) {
   const client = toBe(target, (response ? response : cmd));
   const say = jest.spyOn(client, "say");
 
-  onMessageHandler(client, target, context, cmd, self);
+  clientHandlers.onMessageHandler(client, target, context, cmd, self);
 
   if (type === "toBeCalled") expect(say).toBeCalled();
   if (type === "notToBeCalled") expect(say).not.toBeCalled();

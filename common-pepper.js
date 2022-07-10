@@ -1,8 +1,9 @@
+require("dotenv").config();
+
 const Client = require("./lib/client");
 const Queue = require("./lib/queue");
-const execCmd = require("./lib/command");
 const clientResponse = require("./lib/response");
-const listner = require("./lib/listner");
+const { clientHandlers, listnerHandlers } = require("./utils/handlers");
 const logger = require("./utils/logger");
 const { opts } = require("./config");
 
@@ -10,19 +11,36 @@ const { opts } = require("./config");
 const responseQueue = new Queue();
 const botResponseStatus = { status: 0 };
 
+
 try {
   if (process.env.NODE_ENV !== "test") {
     // Create a client with our options
     const client = new Client(opts);
+    const listner = new Client(opts);
 
     client.on("message", function() {
-      onMessageHandler(client, ...arguments);
+      if (listner.readyState() !== "OPEN") {
+        console.error("Listener is not connected.");
+        return;
+      }
+
+      clientHandlers.onMessageHandler(
+        client, ...arguments, responseQueue
+      );
     });
-    client.on("connected", onConnectedHandler);
+    listner.on("message", function() {
+      listnerHandlers.onMessageHandler(
+        ...arguments, botResponseStatus, responseQueue
+      );
+    });
 
-    client.connect();
+    client.on("connected", clientHandlers.onConnectedHandler);
+    listner.on("connected", listnerHandlers.onConnectedHandler);
 
-    listner(new Client(opts), responseQueue, botResponseStatus);
+
+    client.connect().catch(err => console.error(err));
+    listner.connect().catch(err => console.error(err));
+
 
     setInterval(() => {
       if (responseQueue.isEmpty()) return;
@@ -33,58 +51,17 @@ try {
       const commandResponse = latestResponse.commandResponse;
       clientResponse(client, request, target, commandResponse);
 
+      if (process.env.NODE_ENV === "dev" || process.env.NODE_ENV === "test") {
+        botResponseStatus.status = 1;
+        responseQueue.dequqe();
+      }
+
       if (botResponseStatus.status === 1) {
         botResponseStatus.status = 0;
-        logger.info(`* Executed "${request.join(" ")}" command`);
+        logger.info(`\n* Executed "${request.join(" ")}" command`);
         logger.info("* Details:", { target, commandResponse });
       }
-    }, 1000); // TODO: Dynamically change polling interval via commands
+    }, 5000); // TODO: Dynamically change polling interval via commands
   }
 }
 catch (err) { console.error(err); }
-
-
-function onMessageHandler(client, target, context, msg, self) {
-  const prefix = process.env.PREFIX;
-  const prefixLength = prefix.length;
-
-  // Ignore messages from the bot
-  if (self) return;
-
-  // Ignore non-prefixed messages
-  if (!(msg.substring(0, prefixLength) === prefix)) return;
-  const command = msg;
-
-  /*
-  *Trims whitespace on either side of the chat message and replaces multiple
-  *whitespaces, tabs or newlines between words with just one whitespace
-  */
-  const request = command.trim().replace(/\s\s+/g, " ").split(" ");
-  logger.info(`\n* Raw request "${command}" Received`);
-
-  const commandResponse = execCmd(prefix, context, request);
-  if (!commandResponse) {
-    logger.info(`* Unknown command ${request.join(" ")}`);
-    return;
-  }
-
-  /*
-    Note: Introduction of response queues breaks current message handler test
-    as 'say' member function is called seperately every set interval.
-  */
-  // TODO: Alter test to reflect the changes introduced due to response queues.
-  if (process.env.NODE_ENV === "test") {
-    clientResponse(client, request, target, commandResponse);
-    return;
-  }
-
-  responseQueue.enquqe({ request, target, commandResponse });
-}
-
-
-function onConnectedHandler(addr, port) {
-  logger.info(`* Connected to ${addr}:${port}`);
-}
-
-
-module.exports = { onMessageHandler };
