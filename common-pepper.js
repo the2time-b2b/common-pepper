@@ -1,67 +1,54 @@
 require("dotenv").config();
 
-const Client = require("./lib/client");
-const Queue = require("./lib/queue");
-const clientResponse = require("./lib/response");
-const { clientHandlers, listnerHandlers } = require("./utils/handlers");
-const logger = require("./utils/logger");
+const Client = require("./types/client");
+const { Channel } = require("./types/channel");
+const handlers = require("./utils/handlers");
 const { opts } = require("./config");
 
 
-const responseQueue = new Queue();
-const botResponseStatus = { status: 0 };
+// Create a client with our options
+const client = new Client(opts);
+const listner = new Client(opts);
 
+// Initialize each channel.
+opts.channels.forEach(channel => {
+  new Channel(client, channel.substring(1));
+});
 
-try {
-  if (process.env.NODE_ENV !== "test") {
-    // Create a client with our options
-    const client = new Client(opts);
-    const listner = new Client(opts);
-
-    client.on("message", function() {
-      if (listner.readyState() !== "OPEN") {
-        console.error("Listener is not connected.");
-        return;
-      }
-
-      clientHandlers.onMessageHandler(
-        client, ...arguments, responseQueue
-      );
-    });
-    listner.on("message", function() {
-      listnerHandlers.onMessageHandler(
-        ...arguments, botResponseStatus, responseQueue
-      );
-    });
-
-    client.on("connected", clientHandlers.onConnectedHandler);
-    listner.on("connected", listnerHandlers.onConnectedHandler);
-
-
-    client.connect().catch(err => console.error(err));
-    listner.connect().catch(err => console.error(err));
-
-
-    setInterval(() => {
-      if (responseQueue.isEmpty()) return;
-
-      const latestResponse = responseQueue.retrieve();
-      const request = latestResponse.request;
-      const target = latestResponse.target;
-      const commandResponse = latestResponse.commandResponse;
-      clientResponse(client, request, target, commandResponse);
-
-      if (process.env.NODE_ENV === "dev" || process.env.NODE_ENV === "test") {
-        botResponseStatus.status = 1;
-        responseQueue.dequqe();
-      }
-
-      if (botResponseStatus.status === 1) {
-        botResponseStatus.status = 0;
-        logger.info(`\n* Executed "${request.join(" ")}" command`);
-        logger.info("* Details:", { target, commandResponse });
-      }
-    }, 5000); // TODO: Dynamically change polling interval via commands
+client.on("message", function() {
+  if (listner.readyState() !== "OPEN") {
+    console.error("Listener is not connected.");
+    return;
   }
-}
-catch (err) { console.error(err); }
+
+  const [channel, context, message, self] = arguments;
+
+  const user = Channel.getChannel(channel.substring(1));
+  if (!user) return;
+
+  const responseQueue = user.getResponseQueue();
+
+  handlers.clientHandlers.onMessageHandler(
+    client, channel, context, message, self, responseQueue
+  );
+});
+
+listner.on("message", function() {
+  // eslint-disable-next-line no-unused-vars
+  const [channel, context, response] = arguments;
+
+  const username = String(context.username).toLowerCase();
+  if (!(username === process.env.BOT_USERNAME)) return;
+
+  const user = Channel.getChannel(channel.substring(1));
+  if (!user) return;
+
+  handlers.listnerHandlers.onMessageHandler(user, response);
+});
+
+
+client.on("connected", handlers.clientHandlers.onConnectedHandler);
+listner.on("connected", handlers.listnerHandlers.onConnectedHandler);
+
+client.connect().catch(err => console.error(err));
+listner.connect().catch(err => console.error(err));

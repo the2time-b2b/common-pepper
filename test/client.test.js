@@ -1,57 +1,58 @@
-const Client = require("../lib/client");
-const Channel = require("../lib/channel");
+require("dotenv").config();
+
+const Client = require("../types/client");
+const { MessageState } = require("../types/channel");
 
 
-// Dummy options
-const opts = {
-  identity: {
-    username: "",
-    password: ""
-  },
-  channels: []
-};
-const client = new Client(opts);
+const client = new Client({}); // Dummy options
+const testMessageState = new MessageState();
 
 beforeEach(() => {
   client.SEND_INTERVAL = 0; // Preset cooldown prevention interferes with test.
-
-  Channel.clearChannels();
+  testMessageState.changeMessageState(null, null);
   jest.clearAllMocks();
 });
 
-describe("circumvent message duplication filter where bypass interval,", () => {
-  const message = `${process.env.PREFIX}testCmd same message from the user`;
+describe("For consecutive responses, circumvent duplication filter,", () => {
+  const response = "Some response";
 
-  it("is greater than the elapsed time for consecutive requests", async() => {
-    await testClientResponse(message);
+  it(
+    "if bot sends the same response with elapsed time < bypass interval",
+    async() => {
+      await testClientResponse(response);
 
-    await testClientResponse(message, true);
-  });
-
-  it("is lesser than the elapsed time for consecutive requests", async() => {
-    jest.useFakeTimers(message);
-
-    await testClientResponse(message);
-
-    jest.advanceTimersByTime(31000); // Advances to 30 secs.
-
-    await testClientResponse(message);
-
-    jest.useRealTimers(message);
-  });
+      await testClientResponse(response, true);
+    });
 });
 
 
-describe("do not circumvent message duplication filter", () => {
-  let message = `${process.env.PREFIX}testCmd same message from the user`;
+describe("For consecutive responses, do not circumvent duplication filter",
+  () => {
+    const response = "Some response";
+    const differentResponse = "Some other response";
 
-  it("for different requests", async() => {
-    await testClientResponse(message);
+    it(
+      "if bot sends the different response with elapsed time < bypass interval",
+      async() => {
+        await testClientResponse(response);
 
-    message = `${process.env.PREFIX}testCmd different message from the user`;
-    await testClientResponse(message);
+        await testClientResponse(differentResponse);
+      });
+
+    it(
+      "if bot sends the same response when elapsed time > bypass interval",
+      async() => {
+        jest.useFakeTimers();
+
+        await testClientResponse(response);
+
+        jest.advanceTimersByTime(31000); // Advances to 30 secs.
+
+        await testClientResponse(response);
+
+        jest.useRealTimers();
+      });
   });
-});
 
 
 describe("watch the set SEND_INTERVAL value and respond if", () => {
@@ -69,6 +70,10 @@ describe("watch the set SEND_INTERVAL value and respond if", () => {
 
     jest.advanceTimersByTime(15000); // Advances to 20 secs.
 
+    /**
+     * Response is circumvented as the elapsed time is less than the default
+     * filter bypass interval of a channel.
+     */
     await testClientResponse(message, true);
   });
 
@@ -92,7 +97,9 @@ async function testClientResponse(
   let response;
 
   try {
-    response = await client.say(channel, message);
+    response = await client
+      .say(channel, message, testMessageState.getMessageState());
+    testMessageState.changeMessageState(message, Date.now());
   }
   catch (err) {
     if (rejection) {

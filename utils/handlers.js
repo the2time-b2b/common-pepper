@@ -1,13 +1,26 @@
 const logger = require("../utils/logger");
 const execCmd = require("../lib/command");
 const clientResponse = require("../lib/response");
+const Response = require("../types/response");
 
 
 const clientHandlers = {};
 const listnerHandlers = {};
 
 
-
+/**
+ * Handle user requests.
+ * @param {import("../types/client"} client - Bot's instance.
+ * @param {string} target - A '#' prefiex username of the channel where the
+ * command/message * originated from.
+ * @param {object} context - The chat state of the user who sent the
+ * command/message.
+ * @param {string} msg - The command/message on the target channel.
+ * @param {boolean} self - Flag that specifies whether command/message orignated
+ * from the current bot's instance.
+ * @param {import("../types/queue")} responseQueue - Bot response queue of the
+ * channel.
+ */
 clientHandlers.onMessageHandler = function onMessageHandler(
   client, target, context, msg, self, responseQueue
 ) {
@@ -41,22 +54,24 @@ clientHandlers.onMessageHandler = function onMessageHandler(
   */
   // TODO: Alter test to reflect the changes due to response queues.
   if (process.env.NODE_ENV === "test") {
-    clientResponse(client, request, target, commandResponse);
+    clientResponse(client, target, null, commandResponse);
     return;
   }
 
-  responseQueue.enquqe({ request, target, commandResponse });
+  const responseState = new Response(request, target, commandResponse);
+  responseQueue.enquqe(responseState);
 };
 
 
-listnerHandlers.onMessageHandler = function onMessageHandler(
-  target, context, msg, self, botResponseStatus, responseQueue
-) {
-  if (context.username === process.env.BOT_USERNAME) {
-    botResponseStatus.status = 1;
-    responseQueue.dequqe();
-    return;
-  }
+/**
+ * Monitor bot responses.
+ * @param {import("../lib/channel")} user - Current state of a channel.
+ * @param {string} response - Bot response front of the queue.
+ */
+listnerHandlers.onMessageHandler = function onMessageHandler(user, response) {
+  user.changeBotResponseStatus();
+  user.getResponseQueue().dequqe();
+  user.nextMessageState(response, Date.now());
 };
 
 

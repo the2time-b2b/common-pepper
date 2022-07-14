@@ -8,7 +8,7 @@ class Queue {
 
   dequqe() {
     if (this.#queue.length > 0) this.#queue.shift();
-    else throw new Error("Attempting to dequeue and empty queue.");
+    else throw new Error("Attempting to dequeue an empty queue.");
   }
 
 
