@@ -3,7 +3,21 @@ const tmi = require("tmi.js");
 const CustomError = require("../utils/error");
 
 
-class Client extends tmi.client {
+/**
+ * @class
+ * @extends tmi.Client
+ * @constructor
+ * @member {number} SEND_INTERVAL - Cooldown period between two consecutive
+ * bot responses.
+ * @member {string} DUPMSG_CHAR - Character appended to bot's response to bypass
+ * twitch's duplicate message filter.
+ */
+class Client extends tmi.Client {
+  /**
+   * @param {param} opts
+   * - Client connection options.
+   * - docs: https://tmijs.com/#guide-options
+   */
   constructor(opts) {
     super(opts);
     this.SEND_INTERVAL = process.env.SEND_INTERVAL || "30";
@@ -12,22 +26,10 @@ class Client extends tmi.client {
 
 
   /**
-   * @typedef {Object} State
-   * @property {string} recentMessage - The latest message sent to the channel
-   *  by the bot
-   * @property {number} messageLastSent - Epox time of the latest message sent
-   * by the bot.
-   * @property {number} filterBypassInterval - Interval in seconds, below which
-   * special character is appended at the end of the bot's response to bypass
-   * twitch's message duplication filter.
-   */
-
-  /**
    * Send a response to a particular channel.
    * @param {string} channel - Recipient channel.
    * @param {string} message - Response message.
-   * @param {State} messageState - Current state of the message of the target
-   * channel.
+   * @param {import("../types/channel").MessageState} messageState
    * @returns {Promise<[string]>}
    * - Resolves on message sent and returns [channel] on production.
    * - Resolves and returns [channel, message] on test/dev.

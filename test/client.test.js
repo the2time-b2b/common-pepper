@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const Client = require("../types/client");
-const { MessageState } = require("../types/channel");
+const MessageState = require("../types/channel").MessageState;
 
 
 const client = new Client({}); // Dummy options
@@ -9,7 +9,8 @@ const testMessageState = new MessageState();
 
 beforeEach(() => {
   client.SEND_INTERVAL = 0; // Preset cooldown prevention interferes with test.
-  testMessageState.changeMessageState(null, null);
+  testMessageState.recentMessage = null;
+  testMessageState.messageLastSent = null;
   jest.clearAllMocks();
 });
 
@@ -97,9 +98,9 @@ async function testClientResponse(
   let response;
 
   try {
-    response = await client
-      .say(channel, message, testMessageState.getMessageState());
-    testMessageState.changeMessageState(message, Date.now());
+    response = await client.say(channel, message, testMessageState);
+    testMessageState.recentMessage = message;
+    testMessageState.messageLastSent = Date.now();
   }
   catch (err) {
     if (rejection) {

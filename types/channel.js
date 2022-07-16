@@ -3,6 +3,10 @@ const logger = require("../utils/logger");
 const clientResponse = require("../lib/response");
 
 
+/**
+ * Monitor and manage the state of each channel in which the bot resides.
+ * @class
+ */
 class Channel {
   static #channels = {};
 
@@ -15,7 +19,6 @@ class Channel {
 
 
   /**
-   * Monitor and manage the state of each channel in which the bot resides.
    * @param {import("../types/client")} client - Bot's instance.
    * @param {string} username - Username of the channel.
    */
@@ -65,7 +68,8 @@ class Channel {
    * @param {number} messageLastSent - Epox time of the previous message sent.
    */
   nextMessageState(recentMessage, messageLastSent) {
-    this.#messageState.changeMessageState(recentMessage, messageLastSent);
+    this.#messageState.recentMessage = recentMessage;
+    this.#messageState.messageLastSent = messageLastSent;
   }
 
 
@@ -91,9 +95,8 @@ class Channel {
       const request = responseState.request;
       const target = responseState.target;
       const response = responseState.response;
-      const messageState = this.#messageState.getMessageState();
 
-      clientResponse(client, target, messageState, response);
+      clientResponse(client, target, this.#messageState, response);
 
       /**
        * During dev/test environment, the command response would not be sent to
@@ -121,55 +124,38 @@ class Channel {
 
 
 /**
- * Hold a bot's latest message state for a particular channel.
- */
+   * Hold a bot's latest message state for a particular channel.
+   * @class
+   * @constructor
+   * @public
+   * @member {string} recentMessage - The latest message sent to the channel by
+   * the bot.
+   * @member {number} messageLastSent - Epox time of the latest message sent by
+   * the bot.
+   * @member {number} filterBypassInterval  - Default message duplication
+   * cooldown period.
+   */
 class MessageState {
-  #recentMessage = null; // The latest message sent to the channel by the bot.
-  #messageLastSent = null; // Epox time of the latest message sent by the bot.
-  #filterBypassInterval = 30; // Default message duplication cooldown period.
-
-
-  /**
-   * @typedef {Object} State
-   * @property {string} recentMessage - The latest message sent to the channel
-   *  by the bot
-   * @property {number} messageLastSent - Epox time of the latest message sent
-   * by the bot.
-   * @property {number} filterBypassInterval - Interval in seconds, below which
-   * special character is appended at the end of the bot's response to bypass
-   * twitch's message duplication filter.
-   */
-
-  /**
-   * Get the state of the current message that is to be sent for a particular
-   * channel.
-   * @param {string} username - Username of associated with the channel.
-   * @returns {State} The current message state to be sent of a specified
-   * channel.
-   */
-  getMessageState() {
-    return {
-      recentMessage: this.#recentMessage,
-      messageLastSent: this.#messageLastSent,
-      filterBypassInterval: this.#filterBypassInterval
-    };
+  constructor() {
+    /**
+     * The latest message sent to the channel by the bot.
+     * @type {string}
+     * @public
+     */
+    this.recentMessage = null;
+    /**
+     * Epox time of the latest message sent by the bot.
+     * @type {number}
+     * @public
+     */
+    this.messageLastSent = null;
+    /**
+     * Default message duplication cooldown period.
+     * @type {number}
+     * @public
+     */
+    this.filterBypassInterval = 30;
   }
-
-
-  /**
-   * Change how the next message must be sent on a particular channel.
-   * @param {string} recentMessage - The latest message sent to the channel by
-   * the bot.
-   * @param {number} messageLastSent - Epox time of the latest message sent by
-   * the bot.
-   */
-  changeMessageState(recentMessage, messageLastSent) {
-    this.#recentMessage = recentMessage;
-    this.#messageLastSent = messageLastSent;
-  }
-
-
-  // TODO: Feature to change filterBypassInterval.
 }
 
 

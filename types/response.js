@@ -1,3 +1,8 @@
+/**
+ * A response state for a particular user request on a target channel.
+ * @class
+ * @constructor
+ */
 class Response {
   #request = null;
   #target = null;
@@ -5,7 +10,6 @@ class Response {
 
 
   /**
-   * A response state for a particular user request on a target channel.
    * @param {string} request - Raw request send by the user.
    * @param {string} target - Channel where the request was invoked.
    * @param {string} response - Bot response for the user request.
@@ -15,7 +19,6 @@ class Response {
     this.#target = target;
     this.#response = response;
   }
-
 
 
   /**
