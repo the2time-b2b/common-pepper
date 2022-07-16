@@ -8,7 +8,7 @@ class Channel {
 
   #username = null; // Username of the channel.
   #responseQueue = new Queue(); // Bot response queue of the channel.
-  #botResponseStatus = false; // Status of the latest message.
+  // #botResponseStatus = false; // Status of the latest message.
   #setIntervalID = null; // The unique ID for the setInterval on each channel.
   // TODO: Feature to change filterBypassInterval.
   #messageState = new MessageState();
@@ -70,14 +70,6 @@ class Channel {
 
 
   /**
-   * Returns the status of the bot's first message in queue.
-   */
-  changeBotResponseStatus() {
-    this.#botResponseStatus = !this.#botResponseStatus;
-  }
-
-
-  /**
    * Returns the bot's response queues for a this channel.
    * @returns {import("../types/queue")} - Response queue.
    */
@@ -94,27 +86,25 @@ class Channel {
     this.#setIntervalID = setInterval(() => {
       if (this.#responseQueue.isEmpty()) return;
 
-      const latestResponse = this.#responseQueue.retrieve();
+      const latestQueuedResponse = this.#responseQueue.retrieve();
+      const responseState = latestQueuedResponse.getResponseState();
+      const request = responseState.request;
+      const target = responseState.target;
+      const response = responseState.response;
+      const messageState = this.#messageState.getMessageState();
 
-      const response = latestResponse.getResponseState();
+      clientResponse(client, target, messageState, response);
 
-      const request = response.request;
-      const target = response.target;
-      const commandResponse = response.commandResponse;
-
-      clientResponse(
-        client, target, this.#messageState.getMessageState(), commandResponse
-      );
-
+      /**
+       * During dev/test environment, the command response would not be sent to
+       * twitch IRC server. Therefore, listner would not be able to pick up any
+       * of the bot's response.
+       */
       if (process.env.NODE_ENV === "dev" || process.env.NODE_ENV === "test") {
-        this.changeBotResponseStatus();
-        this.#responseQueue.dequqe();
-      }
-
-      if (this.#botResponseStatus) {
-        this.changeBotResponseStatus();
         logger.info(`\n* Executed "${request.join(" ")}" command`);
-        logger.info("* Details:", { target, commandResponse });
+        logger.info("* Details:", { target, response });
+        this.nextMessageState(response, Date.now());
+        this.#responseQueue.dequqe();
       }
     }, 5000); // TODO: Dynamically change polling interval via commands
   }

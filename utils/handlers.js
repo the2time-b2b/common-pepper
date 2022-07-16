@@ -65,13 +65,34 @@ clientHandlers.onMessageHandler = function onMessageHandler(
 
 /**
  * Monitor bot responses.
- * @param {import("../lib/channel")} user - Current state of a channel.
- * @param {string} response - Bot response front of the queue.
+ * @param {import("../types/channel").Channel} user - Channel's current state.
+ * @param {string} response - Bot response on a target channel.
  */
 listnerHandlers.onMessageHandler = function onMessageHandler(user, response) {
-  user.changeBotResponseStatus();
-  user.getResponseQueue().dequqe();
+  const responseQueue = user.getResponseQueue();
+  const latestQueuedResponse = responseQueue.retrieve();
+  const responseState = latestQueuedResponse.getResponseState();
+  const commandResponse = responseState.response;
+  const request = responseState.request;
+  const target = responseState.target;
+
+
+  // Bot and queues responses must match before dequeue.
+  const bypassChar = " " + String
+    .fromCodePoint(...JSON.parse(process.env.DUPMSG_CHAR));
+
+  if (response.length === (commandResponse.length + bypassChar.length)) {
+    if (response.substring(response.length - bypassChar.length) === bypassChar)
+      response = response.substring(0, response.length - bypassChar.length);
+  }
+  if (response !== commandResponse) return;
+
+
+
+  logger.info(`\n* Executed "${request.join(" ")}" command`);
+  logger.info("* Details:", { target, commandResponse });
   user.nextMessageState(response, Date.now());
+  responseQueue.dequqe();
 };
 
 

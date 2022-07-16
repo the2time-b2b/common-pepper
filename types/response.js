@@ -1,19 +1,19 @@
 class Response {
   #request = null;
   #target = null;
-  #commandResponse = null;
+  #response = null;
 
 
   /**
    * A response state for a particular user request on a target channel.
    * @param {string} request - Raw request send by the user.
    * @param {string} target - Channel where the request was invoked.
-   * @param {string} commandResponse - Bot response for the user request.
+   * @param {string} response - Bot response for the user request.
    */
-  constructor(request, target, commandResponse) {
+  constructor(request, target, response) {
     this.#request = request;
     this.#target = target;
-    this.#commandResponse = commandResponse;
+    this.#response = response;
   }
 
 
@@ -23,7 +23,7 @@ class Response {
    * particular request made by the a user.
    * @property {string} request - Raw request send by the user.
    * @property {string} target - Channel where the request was invoked.
-   * @property {string} commandResponse - Bot response for the user request.
+   * @property {string} response - Bot response for the user request.
    */
 
   /**
@@ -35,7 +35,7 @@ class Response {
     return {
       request: this.#request,
       target: this.#target,
-      commandResponse: this.#commandResponse
+      response: this.#response
     };
   }
 }
