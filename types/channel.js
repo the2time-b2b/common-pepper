@@ -6,15 +6,38 @@ const clientResponse = require("../lib/response");
 /**
  * Monitor and manage the state of each channel in which the bot resides.
  * @class
+ * @constructor
  */
 class Channel {
   static #channels = {};
 
-  #username = null; // Username of the channel.
-  #responseQueue = new Queue(); // Bot response queue of the channel.
-  // #botResponseStatus = false; // Status of the latest message.
-  #setIntervalID = null; // The unique ID for the setInterval on each channel.
-  // TODO: Feature to change filterBypassInterval.
+
+  /**
+   * The unique ID for the setInterval on each channel.
+   * @type {number}
+   * @private
+   */
+  #setIntervalID = null;
+
+  /**
+   * Username of the channel.
+   * @type {ResponsstringeQueue}
+   * @private
+   */
+  #username = null;
+
+  /**
+   *  Bot response queue of the channel.
+   * @type {ResponseQueue}
+   * @private
+   */
+  #responseQueue = null;
+
+  /**
+   * Bot response queue of the channel.
+   * @type {MessageState}
+   * @private
+   */
   #messageState = new MessageState();
 
 
@@ -24,15 +47,16 @@ class Channel {
    */
   constructor(client, username) {
     this.#username = username;
+    this.#responseQueue = new ResponseQueue(this, client);
+
     Channel.#channels[this.#username] = this;
-    this.enableQueueManager(client);
   }
 
 
   /**
    * Get the current instance of a particular channel.
    * @param {string} username - Username of the channel.
-   * @returns {Channel)} - Current instance of a particular channel with the
+   * @returns {Channel} - Current instance of a particular channel with the
    * given username.
    */
   static getChannel(username) {
@@ -75,7 +99,7 @@ class Channel {
 
   /**
    * Returns the bot's response queues for a this channel.
-   * @returns {import("../types/queue")} - Response queue.
+   * @returns {ResponseQueue} - Response queue.
    */
   getResponseQueue() {
     return this.#responseQueue;
@@ -126,37 +150,93 @@ class Channel {
 /**
    * Hold a bot's latest message state for a particular channel.
    * @class
-   * @constructor
    * @public
-   * @member {string} recentMessage - The latest message sent to the channel by
-   * the bot.
-   * @member {number} messageLastSent - Epox time of the latest message sent by
-   * the bot.
-   * @member {number} filterBypassInterval  - Default message duplication
-   * cooldown period.
    */
 class MessageState {
-  constructor() {
-    /**
+  /**
      * The latest message sent to the channel by the bot.
      * @type {string}
      * @public
      */
-    this.recentMessage = null;
-    /**
-     * Epox time of the latest message sent by the bot.
-     * @type {number}
-     * @public
-     */
-    this.messageLastSent = null;
-    /**
-     * Default message duplication cooldown period.
-     * @type {number}
-     * @public
-     */
-    this.filterBypassInterval = 30;
+  recentMessage = null;
+  /**
+   * Epox time of the latest message sent by the bot.
+   * @type {number}
+   * @public
+   */
+  messageLastSent = null;
+  /**
+   * Default message duplication cooldown period.
+   * @type {number}
+   * @public
+   */
+  filterBypassInterval = 30;
+}
+
+
+/**
+ * Orderly manage multiple bot responses to be sent to a channel.
+ */
+class ResponseQueue extends Queue {
+  /**
+   * State of a particular channel.
+   * @type {Channel}
+   * @private
+   */
+  #channel = null;
+
+  /**
+   * Bot's instance.
+   * @type {import("../types/client")}
+   * @private
+   */
+  #client = null;
+
+
+  /**
+   * @param {Channel} channel - State of a particular channel.
+   * @param {import("../types/client")} client - Bot's instance.
+   */
+  constructor(channel, client) {
+    super();
+    this.#channel = channel;
+    this.#client = client;
+  }
+
+
+  /**
+   * Insert multiple bot responses in a queue awaiting to be sent to a channel.
+   * @param {import("./response")} item - Bot response instance.
+   * @description Enables the channel's queue manager if there are more than one
+   * responses in a queue.
+   */
+  enquqe(item) {
+    if (this.isEmpty()) this.#channel.enableQueueManager(this.#client);
+    super.enquqe(item);
+  }
+
+
+  /**
+   * Removes responses from the queue.
+   * @description
+   * - Usually occurs when the response is received to a channel.
+   * - This also disables the channel's queue manager if there are no responses
+   * in a queue.
+   */
+  dequqe() {
+    super.dequqe();
+    if (this.isEmpty()) this.#channel.disableQueueManager();
+  }
+
+
+  /**
+   * Retrieves a bot response instance.
+   * @returns {import("./response")}
+   */
+  retrieve() {
+    return super.retrieve();
   }
 }
 
 
-module.exports = { Channel, MessageState };
+module.exports = { Channel, MessageState, ResponseQueue };

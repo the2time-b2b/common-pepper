@@ -10,7 +10,7 @@ const listnerHandlers = {};
 
 /**
  * Handle user requests.
- * @param {import("../types/client"} client - Bot's instance.
+ * @param {import("../types/client")} client - Bot's instance.
  * @param {string} target - A '#' prefiex username of the channel where the
  * command/message * originated from.
  * @param {object} context - The chat state of the user who sent the
@@ -18,8 +18,8 @@ const listnerHandlers = {};
  * @param {string} msg - The command/message on the target channel.
  * @param {boolean} self - Flag that specifies whether command/message orignated
  * from the current bot's instance.
- * @param {import("../types/queue")} responseQueue - Bot response queue of the
- * channel.
+ * @param {import("../types/channel").ResponseQueue} responseQueue - Bot
+ * response queue of the channel.
  */
 clientHandlers.onMessageHandler = function onMessageHandler(
   client, target, context, msg, self, responseQueue
