@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const Client = require("./types/client");
 const { Channel } = require("./types/channel");
-const handlers = require("./utils/handlers");
+const handlers = require("./lib/handlers");
 const { opts } = require("./config");
 
 

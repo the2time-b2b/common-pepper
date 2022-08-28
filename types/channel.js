@@ -1,6 +1,6 @@
 const Queue = require("../types/queue");
-const logger = require("../utils/logger");
 const clientResponse = require("../lib/response");
+const logger = require("../utils/logger");
 
 
 /**
@@ -13,28 +13,21 @@ class Channel {
 
 
   /**
-   * The unique ID for the setInterval on each channel.
-   * @type {number}
-   * @private
-   */
-  #setIntervalID = null;
-
-  /**
    * Username of the channel.
-   * @type {ResponsstringeQueue}
+   * @type {string}
    * @private
    */
   #username = null;
 
   /**
    *  Bot response queue of the channel.
-   * @type {ResponseQueue}
+   * @type {MessageQueue}
    * @private
    */
   #responseQueue = null;
 
   /**
-   * Bot response queue of the channel.
+   * Current message state of a channel.
    * @type {MessageState}
    * @private
    */
@@ -47,8 +40,9 @@ class Channel {
    */
   constructor(client, username) {
     this.#username = username;
-    this.#responseQueue = new ResponseQueue(this, client);
-
+    this.#responseQueue = new MessageQueue(() => {
+      responseQueueManager(this, client);
+    });
     Channel.#channels[this.#username] = this;
   }
 
@@ -87,6 +81,13 @@ class Channel {
 
 
   /**
+   * Get the current message state of the channel.
+   * @returns {MessageState} - Current message state of the channel.
+   */
+  getMessageState() { return this.#messageState; }
+
+
+  /**
    * Change how the next message must be sent on a particular channel.
    * @param {string} recentMessage - The previous message on the channel.
    * @param {number} messageLastSent - Epox time of the previous message sent.
@@ -99,50 +100,10 @@ class Channel {
 
   /**
    * Returns the bot's response queues for a this channel.
-   * @returns {ResponseQueue} - Response queue.
+   * @returns {MessageQueue} - Response queue.
    */
   getResponseQueue() {
     return this.#responseQueue;
-  }
-
-
-  /**
-   * Enables the retrieval and processing of the channel's response queue.
-   * @param {import("../types/client")} client - Bot's instance.
-   */
-  enableQueueManager(client) {
-    this.#setIntervalID = setInterval(() => {
-      if (this.#responseQueue.isEmpty()) return;
-
-      const latestQueuedResponse = this.#responseQueue.retrieve();
-      const responseState = latestQueuedResponse.getResponseState();
-      const request = responseState.request;
-      const target = responseState.target;
-      const response = responseState.response;
-
-      clientResponse(client, target, this.#messageState, response);
-
-      /**
-       * During dev/test environment, the command response would not be sent to
-       * twitch IRC server. Therefore, listner would not be able to pick up any
-       * of the bot's response.
-       */
-      if (process.env.NODE_ENV === "dev" || process.env.NODE_ENV === "test") {
-        logger.info(`\n* Executed "${request.join(" ")}" command`);
-        logger.info("* Details:", { target, response });
-        this.nextMessageState(response, Date.now());
-        this.#responseQueue.dequqe();
-      }
-    }, 5000); // TODO: Dynamically change polling interval via commands
-  }
-
-
-  /**
-   * Disables the retrieval and processing of the channel's response queue.
-   */
-  disableQueueManager() {
-    clearInterval(this.#setIntervalID);
-    this.#setIntervalID = null;
   }
 }
 
@@ -175,57 +136,66 @@ class MessageState {
 
 
 /**
- * Orderly manage multiple bot responses to be sent to a channel.
+ * Orderly manage multiple bot responses on a channel.
+ * @description
+ * - The queue is polled every set interval and callback is invoked each cycle.
+ * - The poll is activated or deactivated based on the presence of atleast one
+ * response in a queue.
  */
-class ResponseQueue extends Queue {
+class MessageQueue extends Queue {
   /**
-   * State of a particular channel.
-   * @type {Channel}
+   * Function to called every set interval based on the number of response in
+   * the queue.
+   * @type {Function}
    * @private
    */
-  #channel = null;
+  #callback = null;
+
 
   /**
-   * Bot's instance.
-   * @type {import("../types/client")}
+   * A unique interval ID which identifies the timer created by the setInterval
+   * method invocation.
+   * @type {number}
    * @private
    */
-  #client = null;
+  #setIntervalID = null;
 
 
   /**
-   * @param {Channel} channel - State of a particular channel.
-   * @param {import("../types/client")} client - Bot's instance.
+   * @param {Function} callback
+   * - A callback function to be invoked at every set interval based on the
+   * presence of atleast one response in a queue.
    */
-  constructor(channel, client) {
+  constructor(callback) {
     super();
-    this.#channel = channel;
-    this.#client = client;
+    this.#callback = callback;
   }
 
 
   /**
-   * Insert multiple bot responses in a queue awaiting to be sent to a channel.
+   * Insert multiple bot responses in a queue.
    * @param {import("./response")} item - Bot response instance.
-   * @description Enables the channel's queue manager if there are more than one
-   * responses in a queue.
+   * @description Enables the recurring callback invocation if there are more
+   * than one response in a queue.
    */
   enquqe(item) {
-    if (this.isEmpty()) this.#channel.enableQueueManager(this.#client);
+    // TODO: Dynamically change polling interval via commands
+    if (this.isEmpty()) this.#setIntervalID = setInterval(this.#callback, 5000);
     super.enquqe(item);
   }
 
 
   /**
-   * Removes responses from the queue.
-   * @description
-   * - Usually occurs when the response is received to a channel.
-   * - This also disables the channel's queue manager if there are no responses
-   * in a queue.
+   * Removes bot responses from the queue.
+   * @description Disables the recurring callback invocation if there are no
+   * response in the queue.
    */
   dequqe() {
     super.dequqe();
-    if (this.isEmpty()) this.#channel.disableQueueManager();
+    if (this.isEmpty()) {
+      clearInterval(this.#setIntervalID);
+      this.#setIntervalID = null;
+    }
   }
 
 
@@ -239,4 +209,40 @@ class ResponseQueue extends Queue {
 }
 
 
-module.exports = { Channel, MessageState, ResponseQueue };
+/**
+   * Enables the retrieval and processing of the channel's response queue.
+   * @description The retrieval and processing of the channel's response queue
+   * is done with the help of the setInterval() method where the response queue
+   * is polled every set interval, in ms.
+   * @param {import("../types/channel").Channel} channel - Bot's instance.
+   * @param {import("../types/client")} client - Bot's instance.
+   * @returns {number} - An interval ID which uniquely identifies the timer
+   * created by the call to setInterval().
+   */
+function responseQueueManager(channel, client) {
+  const responseQueue = channel.getResponseQueue();
+  if (responseQueue.isEmpty()) return;
+
+  const latestQueuedResponse = responseQueue.retrieve();
+  const responseState = latestQueuedResponse.getResponseState();
+  const request = responseState.request;
+  const target = responseState.target;
+  const response = responseState.response;
+
+  clientResponse(client, target, channel.getMessageState(), response);
+
+  /**
+   * During dev/test environment, the command response would not be sent to
+   * twitch IRC server. Therefore, listner would not be able to pick up any
+   * of the bot's response.
+   */
+  if (process.env.NODE_ENV === "dev" || process.env.NODE_ENV === "test") {
+    logger.info(`\n* Executed "${request.join(" ")}" command`);
+    logger.info("* Details:", { target, response });
+    channel.nextMessageState(response, Date.now());
+    responseQueue.dequqe();
+  }
+}
+
+
+module.exports = { Channel, MessageState, MessageQueue };

@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-const { clientHandlers } = require("../utils/handlers");
+const { clientHandlers } = require("../lib/handlers");
 
 const entities = require("./context");
 const { toBe } = require("./helper");

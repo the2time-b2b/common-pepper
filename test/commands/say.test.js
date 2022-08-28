@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const fs = require("fs");
 
-const { clientHandlers } = require("../../utils/handlers");
+const { clientHandlers } = require("../../lib/handlers");
 const { user: userEntitity } = require("../context");
 const testSets = require("./test-sets/say");
 const { say, DB_PATH } = require("../../commands/main/say/index");
