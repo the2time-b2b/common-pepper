@@ -43,7 +43,7 @@ listner.on("message", function() {
   const user = Channel.getChannel(channel.substring(1));
   if (!user) return;
 
-  handlers.listnerHandlers.onMessageHandler(user, response);
+  handlers.listnerHandlers.onMessageHandler(user, channel, response);
 });
 
 
