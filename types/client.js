@@ -28,7 +28,8 @@ class Client extends tmi.Client {
   /**
    * Send a response to a particular channel.
    * @param {string} channel - Recipient channel.
-   * @param {string} message - Response message.
+   * @param {import("../types/response")} responseState - Current state of a
+   * Response.
    * @param {import("../types/channel").MessageState} messageState
    * @returns {Promise<[string]>}
    * - Resolves on message sent and returns [channel] on production.
@@ -37,7 +38,7 @@ class Client extends tmi.Client {
    * of bypassing the message duplication filter and prevents intentional or
    * unintentional global cooldown due to fast chat message invocation rates.
    */
-  say(channel, message, messageState) {
+  say(responseState, messageState) {
     const nodeEnv = process.env.NODE_ENV || "dev";
     const dupMsgChar = this.DUPMSG_CHAR;
     const sendInterval = parseInt(this.SEND_INTERVAL);
@@ -54,20 +55,26 @@ class Client extends tmi.Client {
       // Circumvents Twitch's duplicate message filter
       if (
         elapsed <= bypassInterval
-        && message === messageState.recentMessage
+        && responseState.response === messageState.recentMessage
         && nodeEnv !== "dev"
       ) {
-        message += ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
+        responseState.response +=
+          ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
       }
 
-      if (nodeEnv === "live") return super.say(channel, message);
+      if (nodeEnv === "live") {
+        responseState.resends++;
+        return super.say(responseState.target, responseState.response);
+      }
     }
 
     return new Promise((resolve, reject) => {
       if (elapsed < sendInterval) {
-        reject(new CustomError.sendIntervalError(channel));
+        reject(new CustomError.sendIntervalError(responseState.target));
       }
-      resolve([channel, message]); // For dev/test
+
+      responseState.resends++;
+      resolve([responseState.target, responseState.response]); // For dev/test
     });
   }
 }

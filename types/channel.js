@@ -1,6 +1,5 @@
 const Queue = require("../types/queue");
 const clientResponse = require("../lib/response");
-const logger = require("../utils/logger");
 
 
 /**
@@ -33,15 +32,24 @@ class Channel {
    */
   #messageState = new MessageState();
 
+  /**
+   * Number of resends before automatic dequeue.
+   * @type {number}
+   */
+  #resendLimit = 3;
+
 
   /**
    * @param {import("../types/client")} client - Bot's instance.
    * @param {string} username - Username of the channel.
+   * @param {number} [resendLimit=3] -  Number of resends before the response is
+   * dequeued automatically.
    */
-  constructor(client, username) {
+  constructor(client, username, resendLimit) {
     this.#username = username;
+    if (resendLimit) this.#resendLimit;
     this.#responseQueue = new MessageQueue(() => {
-      responseQueueManager(this, client);
+      responseQueueManager(this, client, this.#resendLimit);
     });
     Channel.#channels[this.#username] = this;
   }
@@ -55,7 +63,9 @@ class Channel {
    */
   static getChannel(username) {
     const channel = Channel.#channels[username];
-    if (!channel) logger.info(`Not deployed on the channel - ${channel}`);
+    if (!channel) {
+      throw new Error(`The channel '${channel}' has not been initialized.`);
+    }
     return channel;
   }
 
@@ -106,33 +116,42 @@ class MessageState {
   /**
      * The latest message sent to the channel by the bot.
      * @type {string}
-     * @public
      */
   #recentMessage = null;
 
   /**
    * Epox time of the latest message sent by the bot.
    * @type {number}
-   * @public
    */
   #messageLastSent = null;
 
   /**
    * Default message duplication cooldown period.
    * @type {number}
-   * @public
    */
   #filterBypassInterval = 30;
 
 
+  /**
+   * The latest message sent to the channel by the bot.
+   * @readonly
+   */
   get recentMessage() {
     return this.#recentMessage;
   }
 
+  /**
+   * Epox time of the latest message sent by the bot.
+   * @readonly
+   */
   get messageLastSent() {
     return this.#messageLastSent;
   }
 
+  /**
+   *  Message duplication cooldown period.
+   * @readonly
+   */
   get filterBypassInterval() {
     return this.#filterBypassInterval;
   }
@@ -140,7 +159,7 @@ class MessageState {
 
   /**
    * Change how the next message must be sent on a particular channel.
-   * @param {string} recentMessage - The previous message on the channel.
+   * @param {string} recentMessage - The last message on the channel.
    * @param {number} messageLastSent - Epox time of the previous message sent.
    */
   nextMessageState(recentMessage, messageLastSent) {
@@ -162,16 +181,13 @@ class MessageQueue extends Queue {
    * Function to called every set interval based on the number of response in
    * the queue.
    * @type {Function}
-   * @private
    */
   #callback = null;
-
 
   /**
    * A unique interval ID which identifies the timer created by the setInterval
    * method invocation.
    * @type {number}
-   * @private
    */
   #setIntervalID = null;
 
@@ -231,33 +247,31 @@ class MessageQueue extends Queue {
    * is polled every set interval, in ms.
    * @param {import("../types/channel").Channel} channel - Bot's instance.
    * @param {import("../types/client")} client - Bot's instance.
+   * @param {number} resendLimit -  Number of times a response resent before it
+   * is removed from the queue automatically.
    * @returns {number} - An interval ID which uniquely identifies the timer
    * created by the call to setInterval().
    */
-function responseQueueManager(channel, client) {
+function responseQueueManager(channel, client, resendLimit) {
   const responseQueue = channel.getResponseQueue();
   if (responseQueue.isEmpty()) return;
 
-  const latestQueuedResponse = responseQueue.retrieve();
-  const responseState = latestQueuedResponse.getResponseState();
-  const request = responseState.request;
-  const target = responseState.target;
-  const response = responseState.response;
+  let responseState = responseQueue.retrieve();
 
-  clientResponse(client, target, channel.getMessageState(), response);
+  if (responseState.resendCount > resendLimit) {
+    responseQueue.dequqe();
+    if (responseQueue.isEmpty()) return;
+    responseState = responseQueue.retrieve();
+  }
 
   /**
    * During dev/test environment, the command response would not be sent to
    * twitch IRC server. Therefore, listner would not be able to pick up any
    * of the bot's response.
    */
-  if (process.env.NODE_ENV === "dev" || process.env.NODE_ENV === "test") {
-    logger.info(`\n* Executed "${request.join(" ")}" command`);
-    logger.info("* Details:", { target, response });
+  clientResponse(client, channel.getMessageState(), responseState);
 
-    const messageState = channel.getMessageState();
-    messageState.nextMessageState(response, Date.now());
-
+  if (!(process.env.NODE_ENV === "live")) {
     responseQueue.dequqe();
   }
 }

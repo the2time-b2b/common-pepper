@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const Client = require("../types/client");
+const Response = require("../types/response");
 const MessageState = require("../types/channel").MessageState;
 
 
@@ -97,7 +98,8 @@ async function testClientResponse(
   let response;
 
   try {
-    response = await client.say(channel, message, testMessageState);
+    const responseState = new Response(null, channel, (message));
+    response = await client.say(responseState, testMessageState);
     testMessageState.nextMessageState(message, Date.now());
   }
   catch (err) {

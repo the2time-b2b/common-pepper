@@ -4,9 +4,32 @@
  * @constructor
  */
 class Response {
+  /**
+   * Raw request send by the user.
+   * @type {string}
+   */
   #request = null;
+
+  /**
+   * Channel where the request was invoked.
+   * @type {string}
+   */
   #target = null;
-  #response = null;
+
+
+  /**
+   * Bot response for the user request.
+   * @type {string}
+   * @public
+   */
+  response = null;
+
+  /**
+   * Number of times the response has been resent.
+   * @public
+   * @type {number}
+   */
+  resendCount = 0;
 
 
   /**
@@ -17,29 +40,25 @@ class Response {
   constructor(request, target, response) {
     this.#request = request;
     this.#target = target;
-    this.#response = response;
+
+    this.response = response;
   }
 
 
   /**
-   * @typedef {Object} ResponseItem - Response state corresponding to a
-   * particular request made by the a user.
-   * @property {string} request - Raw request send by the user.
-   * @property {string} target - Channel where the request was invoked.
-   * @property {string} response - Bot response for the user request.
+   * Raw request send by the user.
+   * @readonly
    */
+  get request() {
+    return this.#request;
+  }
 
   /**
-   * Returns a response state corresponding to a particular request made by the
-   * a user.
-   * @returns {ResponseItem}
+   * Channel where the request was invoked.
+   * @readonly
    */
-  getResponseState() {
-    return {
-      request: this.#request,
-      target: this.#target,
-      response: this.#response
-    };
+  get target() {
+    return this.#target;
   }
 }
 
