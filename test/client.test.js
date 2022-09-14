@@ -9,8 +9,7 @@ const testMessageState = new MessageState();
 
 beforeEach(() => {
   client.SEND_INTERVAL = 0; // Preset cooldown prevention interferes with test.
-  testMessageState.recentMessage = null;
-  testMessageState.messageLastSent = null;
+  testMessageState.nextMessageState(null, null);
   jest.clearAllMocks();
 });
 
@@ -99,8 +98,7 @@ async function testClientResponse(
 
   try {
     response = await client.say(channel, message, testMessageState);
-    testMessageState.recentMessage = message;
-    testMessageState.messageLastSent = Date.now();
+    testMessageState.nextMessageState(message, Date.now());
   }
   catch (err) {
     if (rejection) {

@@ -88,17 +88,6 @@ class Channel {
 
 
   /**
-   * Change how the next message must be sent on a particular channel.
-   * @param {string} recentMessage - The previous message on the channel.
-   * @param {number} messageLastSent - Epox time of the previous message sent.
-   */
-  nextMessageState(recentMessage, messageLastSent) {
-    this.#messageState.recentMessage = recentMessage;
-    this.#messageState.messageLastSent = messageLastSent;
-  }
-
-
-  /**
    * Returns the bot's response queues for a this channel.
    * @returns {MessageQueue} - Response queue.
    */
@@ -119,19 +108,45 @@ class MessageState {
      * @type {string}
      * @public
      */
-  recentMessage = null;
+  #recentMessage = null;
+
   /**
    * Epox time of the latest message sent by the bot.
    * @type {number}
    * @public
    */
-  messageLastSent = null;
+  #messageLastSent = null;
+
   /**
    * Default message duplication cooldown period.
    * @type {number}
    * @public
    */
-  filterBypassInterval = 30;
+  #filterBypassInterval = 30;
+
+
+  get recentMessage() {
+    return this.#recentMessage;
+  }
+
+  get messageLastSent() {
+    return this.#messageLastSent;
+  }
+
+  get filterBypassInterval() {
+    return this.#filterBypassInterval;
+  }
+
+
+  /**
+   * Change how the next message must be sent on a particular channel.
+   * @param {string} recentMessage - The previous message on the channel.
+   * @param {number} messageLastSent - Epox time of the previous message sent.
+   */
+  nextMessageState(recentMessage, messageLastSent) {
+    this.#recentMessage = recentMessage;
+    this.#messageLastSent = messageLastSent;
+  }
 }
 
 
@@ -239,7 +254,10 @@ function responseQueueManager(channel, client) {
   if (process.env.NODE_ENV === "dev" || process.env.NODE_ENV === "test") {
     logger.info(`\n* Executed "${request.join(" ")}" command`);
     logger.info("* Details:", { target, response });
-    channel.nextMessageState(response, Date.now());
+
+    const messageState = channel.getMessageState();
+    messageState.nextMessageState(response, Date.now());
+
     responseQueue.dequqe();
   }
 }
