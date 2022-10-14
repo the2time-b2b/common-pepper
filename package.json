@@ -5,6 +5,7 @@
   "main": "common-pepper.js",
   "scripts": {
     "start": "cross-env NODE_ENV=live node common-pepper.js",
+    "live:test": "cross-env NODE_ENV=live ./node_modules/nodemon/bin/nodemon.js common-pepper.js",
     "dev": "cross-env NODE_ENV=dev ./node_modules/nodemon/bin/nodemon.js common-pepper.js",
     "test": "cross-env NODE_ENV=test jest --silent",
     "test:log": "cross-env NODE_ENV=test jest",

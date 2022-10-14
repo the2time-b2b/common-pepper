@@ -22,7 +22,14 @@ class Response {
    * @type {string}
    * @public
    */
-  response = null;
+  #response = null;
+
+  /**
+   * Indicate whether the current response to be sent is duplicate of the
+   * response that was previously sent.
+   * @type {boolean}
+   */
+  #isDuplicate = false;
 
   /**
    * Number of times the response has been resent.
@@ -41,7 +48,7 @@ class Response {
     this.#request = request;
     this.#target = target;
 
-    this.response = response;
+    this.#response = response;
   }
 
 
@@ -59,6 +66,27 @@ class Response {
    */
   get target() {
     return this.#target;
+  }
+
+  /**
+   * Channel where the request was invoked.
+   * @readonly
+   */
+  get response() {
+    if (!this.#isDuplicate) return this.#response;
+
+    const dupMsgChar = process.env.DUPMSG_CHAR;
+    const bypassChar = ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
+    return this.#response + bypassChar;
+  }
+
+  activateDuplicationFilterByass(isActive) {
+    if (isActive) {
+      if (!this.#isDuplicate) this.#isDuplicate = !this.#isDuplicate;
+    }
+    else {
+      if (this.#isDuplicate) this.#isDuplicate = !this.#isDuplicate;
+    }
   }
 }
 

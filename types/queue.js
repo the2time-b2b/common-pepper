@@ -2,6 +2,7 @@ class Queue {
   #queue = [];
 
   enquqe(item) {
+    if (!item) throw new Error("An item to be enquqe is missing.");
     this.#queue.push(item);
   }
 

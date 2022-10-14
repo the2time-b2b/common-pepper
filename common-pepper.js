@@ -4,6 +4,8 @@ const Client = require("./types/client");
 const { Channel } = require("./types/channel");
 const handlers = require("./lib/handlers");
 const { opts } = require("./config");
+const logger = require("./utils/logger");
+
 
 
 // Create a client with our options
@@ -28,9 +30,16 @@ client.on("message", function() {
 
   const responseQueue = user.getResponseQueue();
 
-  handlers.clientHandlers.onMessageHandler(
-    client, channel, context, message, self, responseQueue
-  );
+  try {
+    handlers.clientHandlers.onMessageHandler(
+      client, channel, context, message, self, responseQueue
+    );
+  }
+  catch (err) {
+    logger.info("* Command could not be executed: " + message);
+    console.error(err);
+    return;
+  }
 });
 
 listner.on("message", function() {

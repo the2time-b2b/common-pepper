@@ -9,12 +9,12 @@ function toBe(expectedTarget, expectedResponse) {
   return {
     /**
    * Override the client object's `say` method.
-   * @param {string} target Target channel in the format `#<channel>`.
-   * @param {string} response Bot response.
+   * @param {import("../types/response")} responseState Current state of a
+   * response.
    */
-    say: (target, response) => {
-      expect(target).toBe(expectedTarget);
-      expect(response).toBe(expectedResponse);
+    say: (responseState) => {
+      expect(responseState.target).toBe(expectedTarget);
+      expect(responseState.response).toBe(expectedResponse);
     }
   };
 }

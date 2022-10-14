@@ -1,362 +1,332 @@
-const logger = require("../../../utils/logger");
-const fs = require("fs");
-const path = require("path");
+const Command = require("../../command");
+const Task = require("./task");
+const Tasks = require("./tasks");
+
+const description = require("./description");
 
 
-const DB_PATH = path.join(
-  __dirname,
-  `tasks-db${(process.env.NODE_ENV !== "test" ? "" : ".test")}.json`
-);
-
-
-(function DBInit() {
-  try {
-    if (!fs.existsSync(DB_PATH)) {
-      fs.writeFileSync(DB_PATH, JSON.stringify([{}], null, 2));
-    }
-  }
-  catch (err) { console.error(err); }
-})();
-
-
-const say = {
-  help: "Say something at every interval on a particular channel.",
-  usage: `${process.env.PREFIX}say <message> every <h>:<m>:<s> on <channel> ` +
-    "named <task-name>",
-  modify: `${process.env.PREFIX}say modify say|on|every|named ` +
-    "<message>|<h>:<m>:<s>|<channel>|<task-name>",
-  example: `${process.env.PREFIX}say my repeat message every 02:5:30 on ` +
-    "pogTV named some-name",
-  message: "Message to be repeated for every specified interval.",
-  channel: "Channel in which the bot says the specified message " +
-    "every set interval.",
-  "task-name": "Unique name for the task.",
+class Say extends Command {
   /**
-   * Sends a bot response for on specified particular channel and set interval.
-   * @memberof say
-   * @method exec
-   * @param {Array<string>} request
-   * @param {string} context
-   * @returns {string}
+   * Invokes a bot response on a specified channel based on set attributes.
+   * @param {import("tmi.js").CommonUserstate} context Meta data of the user who
+   *  invoked the command.
+   * @param {Array<string>} request User request that contains attributable
+   * information on how the bot response is to be invoked.
+   * @returns {string} Status of the executed command to be sent back to the
+   * user who invoked it.
    */
-  exec: function(context, request) {
+  static exec(context, request) {
     if (request.join(" ") === "clear task list") {
-      fs.writeFileSync(DB_PATH, JSON.stringify([{}], null, 2));
+      Tasks.clearTasks();
       return "The task list has been wiped clean.";
     }
     if (request[0] === "modify") {
-      return this.modifyTask(request.splice(1));
-    }
-    /*
-      A sample message such as "this is a test message every 1:0:0 on channel
-      named task-name" is spliced as follows:
-      *----------------------------------------------------------------------*
-      |         request           |                 meta                     |
-      |----------------------------------------------------------------------|
-      |   this is a test message  |  every 1:0:0 on channel named task-name  |
-      *----------------------------------------------------------------------*
-     */
-    const meta = request.splice(request.length - 6);
-    if (
-      request.length === 0
-      || meta[0] !== "every"
-      || meta[meta.length - 4] !== "on"
-      || meta[meta.length - 2] !== "named"
-    ) {
-      return this.usage;
+      const modifiedAttributes = request.splice(1);
+      return Say.#modifyTask(modifiedAttributes);
     }
 
-    const [, every, , on, , taskName] = meta;
+    // Seperate the bot message to be sent from it's meta conditions.
+    const metaAtrributeValueLength = 6;
+    const meta = request.splice(request.length - metaAtrributeValueLength);
 
-    const regexNotMatch = this
-      .checkRegexNotMatch({ every, on, named: taskName });
-    if (regexNotMatch) return regexNotMatch;
+    if (!Say.#checkCommandStructure(request, meta)) return description.usage;
 
-
-    const intervalInSeconds = this.parseSeconds(every);
-    if (!intervalInSeconds) return "Please enter a valid interval.";
-
-    const newTask = {
-      totalWaitInterval: intervalInSeconds,
-      channel: on.toLowerCase(),
-      taskMessage: request.join(" ")
+    const [
+      intervalAttribute, interval,
+      channelAttribute, channel,
+      tasknameAttribute, taskName
+    ] = meta;
+    const attributeKeyValue = {
+      [intervalAttribute]: interval,
+      [channelAttribute]: channel,
+      [tasknameAttribute]: taskName
     };
 
-    return this.updateTaskList(taskName, "create", newTask);
-  },
+
+    const attributeKeys = Object.keys(attributeKeyValue);
+    const isValidAttributeKeys = Say.#checkAttributeKeys(attributeKeys);
+    if (!isValidAttributeKeys) return description.usage;
+
+
+    for (let i = 0; i < attributeKeys.length; i++) {
+      const attributeKey = attributeKeys[i];
+      const attributeValue = attributeKeyValue[attributeKey];
+      const isValidAttributeValue =
+        Say.#checkAttributeValue(attributeKey, attributeValue);
+      if (!isValidAttributeValue) {
+        switch (attributeKey) {
+          case "say":
+            return description.message;
+          case "every":
+            return description.interval;
+          case "on":
+            return description.channel;
+          case "named":
+            return description["task-name"];
+        }
+      }
+    }
+
+
+    const parsedInterval = Say.#parseInterval(interval);
+
+    const validatedInterval = Say.#validateIntervalRange(...parsedInterval);
+    if (!validatedInterval) return description.interval;
+
+    const intervalInSeconds = Say.#convertToSeconds(...parsedInterval);
+
+    const validatedSeconds = Say.#validateIntervalRange(intervalInSeconds);
+    if (!validatedSeconds) return description.interval;
+
+
+    const newTask = new Task(
+      taskName,
+      intervalInSeconds,
+      channel.toLowerCase(),
+      request.join(" ")
+    );
+
+    return Tasks.createTask(newTask);
+  }
+
 
   /**
-  * Update or remove specified task name.
+  * Changes the state of a task having a specified task name.
   * @param {Array<string>} request List containing task name and its
-  * corresponding modification arguments.
+  * corresponding atrributes to be modified.
   */
-  modifyTask: function(request) {
-    const taskName = request.splice(0, 1);
+  static #modifyTask(request) {
+    const [taskName] = request.splice(0, 1);
 
     if (request.length === 1 && ["remove", "delete"].includes(request[0])) {
-      return this.updateTaskList(taskName, "delete");
+      return Tasks.deleteTask(taskName);
     }
 
-    if (
-      request.length === 1
-      || !["say", "every", "on", "named"].includes(request[0])
-    ) {
-      return this.modify;
-    }
+    const attribute = request[0];
+    const isValidAttribute = Say.#checkAttributeKeys(attribute);
+    if (request.length === 1 || !isValidAttribute) return description.modify;
 
-    const modifiedTask = {};
     const [modifyType] = request.splice(0, 1);
 
-    if (modifyType !== "say" && request.length === 1) {
-      const regexNotMatch = this
-        .checkRegexNotMatch({ [modifyType]: request[0] });
-      if (regexNotMatch) return regexNotMatch;
+    const isTaskAtribute = Say.#checkAttributeValue(modifyType, request[0]);
+    if (!isTaskAtribute) {
+      switch (modifyType) {
+        case "say":
+          return description.message;
+        case "every":
+          return description.interval;
+        case "on":
+          return description.channel;
+        case "named":
+          return description["task-name"];
+      }
     }
 
-    switch (modifyType) {
-      case "say":
-        modifiedTask.taskMessage = request.join(" ");
-        break;
+    let intervalInSeconds;
+    if (modifyType === "every") {
+      const parsedInterval = Say.#parseInterval(request[0]);
+
+      const validatedInterval = Say.#validateIntervalRange(...parsedInterval);
+      if (!validatedInterval) return "Please enter a valid interval.";
+
+      intervalInSeconds = Say.#convertToSeconds(...parsedInterval);
+      const validatedSeconds = Say.#validateIntervalRange(intervalInSeconds);
+      if (!validatedSeconds) return "Please enter a valid interval.";
+    }
+
+    const newTask = new Task(
+      (modifyType === "named") ? request[0] : null,
+      (modifyType === "every") ? intervalInSeconds : null,
+      (modifyType === "on") ? request[0].toLowerCase() : null,
+      (modifyType === "say") ? request.join(" ") : null,
+    );
+
+    return Tasks.updateTask(taskName, newTask);
+  }
+
+
+  /**
+   * Makes sure that the command is structured properly.
+   * @param {Array<string>} message A list of words intended to be sent based
+   * on the conditions in the meta data.
+   * @param {Array<string>} meta The information list which specifies how the
+   * message must be sent.
+   * @returns {boolean} Indicates if the command is properly structured or not.
+   */
+  static #checkCommandStructure(message, meta) {
+    if (message.length === 0) return false;
+    if (meta[0] !== "every") return false;
+    if (meta[meta.length - 4] !== "on") return false;
+    if (meta[meta.length - 2] !== "named") return false;
+
+    return true;
+  }
+
+
+  /**
+   * @param {"say" | "every" | "on" | "named"} taskAttribute Task attribute that
+   * contain information that dictate how a message should be sent by a
+   * particular task.
+   * @param {string} attributeValue The value of the task attribute to be
+   * validated.
+   * @returns {boolean} - Performs a regex check to validate the format of each
+   * task attribute.
+   */
+  static #checkAttributeValue(taskAttribute, attributeValue) {
+    if (taskAttribute === "say") {
+      /**
+      * The message length limit is enforced by twitch itself.
+      * Just makes sure the message to be modified exists.
+      */
+
+      if (attributeValue.length === 0) return false;
+      return true;
+    }
+
+    switch (taskAttribute) {
       case "every":
-        modifiedTask.totalWaitInterval = this.parseSeconds(request[0]);
+        if (!attributeValue.match(/^\d+$|^(\d+:){1,2}(\d+)$/)) {
+
+          return false;
+        }
+
         break;
       case "on":
-        modifiedTask.channel = request[0].toLowerCase();
+        if (!attributeValue.match(/^[a-zA-Z0-9_]{4,25}$/)) {
+          return false;
+        }
+
         break;
       case "named":
-        modifiedTask["named"] = request[0];
+        if (!attributeValue.match(/^[a-zA-Z0-9_-]{3,40}$/)) {
+          return false;
+        }
+
         break;
     }
 
-    return this.updateTaskList(taskName, "modify", modifiedTask);
-  },
+    return true;
+  }
+
 
   /**
-  * Updates the existing task list.
-  * @param {String} taskName Name of the task.
-  * @param {("create" | "modify" | "delete")} type Operation to be performed on
-  * the on the current task list.
-  * @param {Object} updatedTask A task instance.
-  */
-  updateTaskList: function(taskName, type, updatedTask) {
-    try {
-      const db = fs.readFileSync(DB_PATH);
-      const JSONfile = JSON.parse(db);
+   * Check if the passed attribute keys are valid.
+   * @param {string | Array<string>} attributeKeys A attribute or arrays of
+   * attributes that needs to b validated.
+   */
+  static #checkAttributeKeys(attributeKeys) {
+    const validAttributeKeys = ["say", "every", "on", "named"];
 
-      if (!this.validateJSON(JSONfile, ((type === "modify" ? taskName : "")))) {
-        return "Invalid Task List.";
-      }
-      const [tasks] = JSONfile;
+    if (!(attributeKeys instanceof Array)) {
 
-      let returnedValue;
-      switch (type) {
-        case "create":
-          returnedValue = `Task ${taskName} activated on channel ` +
-            `${updatedTask.channel}.`;
-
-          if (tasks[taskName]) {
-            return `Task with name '${taskName}' already exists.`;
-          }
-
-          tasks[taskName] = updatedTask;
-
-          break;
-        case "modify":
-          returnedValue = `Task ${taskName} successfully modified.`;
-          if (!tasks[taskName]) {
-            return `The task '${taskName}' does not exists.`;
-          }
-
-          if (Object.keys(updatedTask).includes("named")) {
-            if (taskName !== updatedTask["named"]) {
-              tasks[updatedTask["named"]] = tasks[taskName];
-              delete tasks[taskName]; // Deletes old task name
-            }
-          }
-          else {
-            const old = tasks[taskName];
-            const modified = { ...old, ...updatedTask };
-            tasks[taskName] = modified;
-          }
-
-          break;
-        case "delete":
-          returnedValue = `Task ${taskName} successfully removed.`;
-          if (!tasks[taskName]) {
-            return `The task '${taskName}' does not exists.`;
-          }
-          delete tasks[taskName];
-
-          break;
-      }
-
-      fs.writeFileSync(DB_PATH, JSON.stringify([tasks], null, 4));
-
-      return returnedValue;
-    }
-    catch (err) {
-      if (err instanceof SyntaxError) {
-        console.error(err.message + " for the file in path: " + DB_PATH);
-      }
-      else if (err.code && err.code === "ENOENT") {
-        console.error(err.message);
-      }
-      else {
-        console.error(err);
-      }
-
+      if (validAttributeKeys.includes(attributeKeys)) return true;
       return false;
     }
-  },
-  /**
-   *
-   * @param {Array} toMatch
-   * @param {string} type
-   * @returns
-   */
-  checkRegexNotMatch: function(toMatch) {
-    for (const type in toMatch) {
-      switch (type) {
-        case "every":
-          if (!toMatch[type].match(/^\d+$|^(\d+:){1,2}(\d+)$/)) {
-            return "Interval should be in h:m:s or m:s or s format.";
-          }
 
-          break;
-        case "on":
-          if (!toMatch[type].match(/^[a-zA-Z0-9_]{4,25}$/)) {
-            return "Username should only contain alphanumeric and underscores, "
-              + "ranging from 4-25 characters only.";
-          }
-
-          break;
-        case "named":
-          if (!toMatch[type].match(/^[a-zA-Z0-9_-]{3,40}$/)) {
-            return "Task names should only contain alphanumerics, hyphens "
-              + "and underscores, ranging from 3-50 characters only.";
-          }
-
-          break;
-      }
+    for (let i = 0; i < attributeKeys.length; i++) {
+      if (!(validAttributeKeys.includes(attributeKeys[i]))) return false;
     }
-    return false;
-  },
+
+    return true;
+  }
+
+
   /**
-   * Converts the interval from ':' delimited string format to seconds.
+   * Splits ':' delimited string interval to it's respective units of time.
    * @param {string} interval
    * - Restricted combination of `hours`, `minutes` and `seconds` time units
-   * delimited with a `:` (colon) in a specific order.
+   * delimited with a `: ` (colon) in a specific order.
    * - The formats are allowed to arranged in any of the following order:
-   *    - `h:m:s`
-   *    - `m:s`
+   *    - `h: m: s`
+   *    - `m: s`
    *    - `s`
    *
    * ```js
-   * const inSeconds = parseSeconds("24:00:00"); // In h:m:s format
-   * console.log("inSeconds"); // prints 86400
+  * const inSeconds = parseInterval("24:00:00"); // In h:m:s format
    *
    * // OR
    *
-   * const inSeconds = parseSeconds("60:00"); // In m:s format
-   * console.log("inSeconds"); // prints 3600
+   * const inSeconds = parseInterval("60:00"); // In m:s format
    * ```
-   * @returns {number} returns an integer representing seconds.
+   * @returns {[seconds: number, minutes: number, hours: number]} Returns a list
+   * of parsed units time.
    */
-  parseSeconds: function(interval) {
+  static #parseInterval(interval) {
     const timeParts = interval.split(":")
-      .map(timePart => parseInt(timePart));
+      .map(timePart => parseInt(timePart)); // Format: HH:MM:SS
 
-    const hms = {};
-    switch (timeParts.length) {
-      case 1:
-        ({ 0: hms.seconds } = timeParts);
+    return timeParts.reverse(); // Reverseed format: HH:MM:SS -> SS:MM:HH
+  }
 
-        break;
-      case 2:
-        ({ 0: hms.minutes, 1: hms.seconds } = timeParts);
 
-        break;
-      case 3:
-        (
-          {
-            0: hms.hours,
-            1: hms.minutes,
-            2: hms.seconds
-          } = timeParts
-        );
-
-        break;
+  /**
+   * Checks if the range of the interval is valid in accordance to javascript.
+   * @param {number} seconds
+   * @param {number} [minutes]
+   * @param {number} [hours]
+   */
+  static #validateIntervalRange(seconds, minutes = null, hours = null) {
+    // Negative time parts are handled by regex.
+    if (!seconds && seconds !== 0) { // Number 0 can be falsy.
+      throw new Error("parameter 'seconds' is not defined");
     }
 
-    // Negative time parts are handled by regex.
-    const { hours, minutes, seconds } = hms;
-    const epox = (new Date()).getTime();
-    if (
-      (seconds && (new Date(epox + seconds)).toString() === "Invalid Date")
-      || (
-        minutes
-        && (new Date(epox + (minutes * 60))).toString() === "Invalid Date")
-      || (
-        hours
-        && (new Date(epox + (hours * 60 * 60))).toString() === "Invalid Date"
-      )
-    ) return 0;
-
-    let intervalInSeconds = 0;
-    if (seconds) { intervalInSeconds += seconds; }
-    if (minutes) { intervalInSeconds += (minutes * 60); }
-    if (hours) { intervalInSeconds += (hours * 60 * 60); }
-
-    if (((new Date(intervalInSeconds)).toString() === "Invalid Date")) return 0;
-
-    return intervalInSeconds;
-  },
-  /**
-   * Validates local JSON database for any invalid structures.
-   * @example An example of a both a valid JSON parsing database along with
-   * proper structure:
-   * ```js
-   * [
-   *     {
-   *         "<task_name>": {
-   *             "totalWaitInterval": "<total_time_in_seconds>",
-   *             "channel": "<channel_name>",
-   *             "taskMessage": "<message>"
-   *         }...
-   *     }
-   * ]
-   * ```
-   * @param {Object} db
-   * - Parsed JSON file.
-   * - Set the value to be an empty string - `""`, if it's not to be validated.
-   * @param {String} taskName Name of the task for task specific validation.
-   */
-  validateJSON: function(db, taskName = "") {
-    const properJSONStructure = "A valid JSON structure should be of the " +
-      "format:\n[\n\t{\n\t\t\"<task name>\": {\n\t\t\t\"totalWaitInterval\"" +
-      ": <total_time_in_seconds>,\n\t\t\t\"channel\": \"<channel_name>\"," +
-      "\n\t\t\t\"taskMessage\": \"<message>\"\n\t\t}\n\t\t\"<another task " +
-      "name>\": {\n\t\t\t...\n\t\t}...\n\t}\n]";
-
-    const taskList = /^(\[{(("[a-zA-Z0-9_-]{3,40}":{("totalWaitInterval":\d+,"channel":"[a-zA-Z0-9_]{4,25}","taskMessage":"(([^"]|(\\"))*)")},){0,}("[a-zA-Z0-9_-]{3,40}":{("totalWaitInterval":\d+,"channel":"[a-zA-Z0-9_]{4,25}","taskMessage":"(([^"]|(\\"))*)")}))*}\])$/;
-
-    if (JSON.stringify(db).match(taskList)) return true;
-
-    if (taskName) {
-      const [tasks] = db;
-      if (tasks[taskName] && Object.keys(tasks[taskName]).length !== 3) {
-        console.error(
-          "\n\x1b[31m%s\x1b[0m",
-          `Unnecessary/missing attribute for the task '${taskName[0]}':`
-        );
-        console.error("\n\x1b[31m%s\x1b[0m", tasks[taskName]);
-        logger.info();
+    if (hours || hours === 0) {
+      if (!minutes && minutes !== 0) {
+        throw new Error("parameter 'minutes' is not defined");
+      }
+      if (hours === 0 && minutes === 0 && seconds === 0) {
+        return false;
       }
     }
-    logger.info("\x1b[34m%s\x1b[0m", properJSONStructure);
-    return false;
+
+    const epox = (new Date()).getTime();
+
+    const stringifySeconds = (new Date(epox + seconds)).toString();
+    if (stringifySeconds === "Invalid Date") {
+      return false;
+    }
+
+    if (minutes) {
+      minutes *= 60;
+      const stringifyMinutes = (new Date(epox + minutes)).toString();
+      if (stringifyMinutes === "Invalid Date") {
+        return false;
+      }
+    }
+
+    if (hours) {
+      hours *= (60 * 60);
+      const stringifyHours = (new Date(epox + hours)).toString();
+      if (stringifyHours === "Invalid Date") {
+        return false;
+      }
+    }
+
+    return true;
   }
-};
 
 
-module.exports = { say, DB_PATH };
+  /**
+   * Converts each respective time unit to seconds.
+   * @extends
+   * @param {number} seconds
+   * @param {number} [minutes]
+   * @param {number} [hours]
+   */
+  static #convertToSeconds(seconds, minutes = null, hours = null) {
+    if (!seconds) {
+      if (seconds !== 0) { // As 0 is Falsy.
+        throw new ReferenceError("seconds should be defined.");
+      }
+    }
+
+    if (minutes) { seconds += (minutes * 60); }
+    if (hours) { seconds += (hours * 60 * 60); }
+
+    return seconds;
+  }
+}
+
+
+module.exports = Say;

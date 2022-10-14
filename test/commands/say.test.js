@@ -1,12 +1,17 @@
 require("dotenv").config();
 
 const fs = require("fs");
+const Task = require("../../commands/main/say/task");
+const Tasks = require("../../commands/main/say/tasks");
 
 const { clientHandlers } = require("../../lib/handlers");
 const { user: userEntitity } = require("../context");
 const testSets = require("./test-sets/say");
-const { say, DB_PATH } = require("../../commands/main/say/index");
+const say = require("../../commands/main/say/index");
 const { toBe } = require("../helper");
+
+const description = require("../../commands/main/say/description");
+
 
 
 const onMessageHandler = clientHandlers.onMessageHandler;
@@ -14,16 +19,17 @@ const onMessageHandler = clientHandlers.onMessageHandler;
 
 describe("The 'say' command should", () => {
   const { context, self } = userEntitity;
+  const commandPrefix = process.env.PREFIX;
   const target = "#sven_snusberg";
-  const cmdName = `${process.env.PREFIX}say `;
+  const cmdName = commandPrefix + "say ";
 
   beforeEach(() => {
-    fs.writeFileSync(DB_PATH, JSON.stringify([{}], null, 4));
+    fs.writeFileSync(Tasks.databasePath, JSON.stringify([{}], null, 4));
   });
 
   test("have a JSON database initialized if it doesn't exists", () => {
-    expect(fs.existsSync(DB_PATH)).toBeTruthy();
-    const db = fs.readFileSync(DB_PATH);
+    expect(fs.existsSync(Tasks.databasePath)).toBeTruthy();
+    const db = fs.readFileSync(Tasks.databasePath);
     expect(JSON.parse(db)).toEqual([{}]);
   });
 
@@ -35,7 +41,7 @@ describe("The 'say' command should", () => {
     ];
 
     for (let i = 0; i < testSets.validCommandList.length; i++) {
-      let db = fs.readFileSync(DB_PATH);
+      let db = fs.readFileSync(Tasks.databasePath);
       let [tasks] = JSON.parse(db);
       expect(Object.keys(tasks)).toHaveLength(i);
 
@@ -50,7 +56,7 @@ describe("The 'say' command should", () => {
         `Task ${taskName} activated on channel ${channel.toLowerCase()}.`
       );
 
-      onMessageHandler(client, target, ...args);
+      onMessageHandler(client, target, ...args, null);
 
       const newTask = {
         totalWaitInterval: totalWaitIntervalList[i],
@@ -58,7 +64,7 @@ describe("The 'say' command should", () => {
         taskMessage: sayMessage
       };
 
-      db = fs.readFileSync(DB_PATH);
+      db = fs.readFileSync(Tasks.databasePath);
       [tasks] = JSON.parse(db);
       expect(Object.keys(tasks)).toHaveLength(i + 1);
       expect(tasks).toHaveProperty(taskName);
@@ -74,26 +80,24 @@ describe("The 'say' command should", () => {
       ];
       const client = toBe(target, say[meta]);
 
-      onMessageHandler(client, target, ...args);
+      onMessageHandler(client, target, ...args, null);
     });
   });
 
   test("display the command usage format for badly formatted commands", () => {
     for (let i = 0; i < testSets.invalidCommandList.length; i++) {
       const args = [context, cmdName + testSets.invalidCommandList[i], self];
-      const client = toBe(target, say.usage);
+      const client = toBe(target, description.usage);
 
-      onMessageHandler(client, target, ...args);
+      onMessageHandler(client, target, ...args, null);
     }
   });
 
   describe("capture all regex mismatch", () => {
     const mismatchTypeResultPair = {
-      "every": "Interval should be in h:m:s or m:s or s format.",
-      "on": "Username should only contain alphanumeric and underscores, " +
-        "ranging from 4-25 characters only.",
-      "named": "Task names should only contain alphanumerics, hyphens and" +
-        " underscores, ranging from 3-50 characters only."
+      "every": description.interval,
+      "on": description.channel,
+      "named": description["task-name"]
     };
 
     for (const type in mismatchTypeResultPair) {
@@ -123,7 +127,7 @@ describe("The 'say' command should", () => {
           ];
           const client = toBe(target, mismatchTypeResultPair[type]);
 
-          onMessageHandler(client, target, ...args);
+          onMessageHandler(client, target, ...args, null);
         }
       });
     }
@@ -135,7 +139,7 @@ describe("The 'say' command should", () => {
         target, "Task task-name activated on channel channel."
       );
 
-      onMessageHandler(client, target, ...args);
+      onMessageHandler(client, target, ...args, null);
 
       const invalidCommandPartList = {
         every: testSets.invalidIntervalList,
@@ -152,7 +156,7 @@ describe("The 'say' command should", () => {
             context, command + invalidCommandPartList[modifiedType][i], self
           ];
           const client = toBe(target, mismatchTypeResultPair[modifiedType]);
-          onMessageHandler(client, target, ...args);
+          onMessageHandler(client, target, ...args, null);
         }
       });
     });
@@ -178,9 +182,9 @@ describe("The 'say' command should", () => {
 
     for (let i = 0; i < commandList.length; i++) {
       const args = [context, cmdName + commandList[i], self];
-      const client = toBe(target, "Please enter a valid interval.");
+      const client = toBe(target, description.interval);
 
-      onMessageHandler(client, target, ...args);
+      onMessageHandler(client, target, ...args, null);
     }
   });
 
@@ -189,11 +193,11 @@ describe("The 'say' command should", () => {
     const args = [context, command, self];
     let client = toBe(target, "Task task-name activated on channel channel.");
 
-    onMessageHandler(client, target, ...args);
+    onMessageHandler(client, target, ...args, null);
 
-    client = toBe(target, "Task with name 'task-name' already exists.");
+    client = toBe(target, "Task 'task-name' already exists.");
 
-    onMessageHandler(client, target, ...args);
+    onMessageHandler(client, target, ...args, null);
   });
 
   test("allow modification of already existing task names", () => {
@@ -201,7 +205,7 @@ describe("The 'say' command should", () => {
     let args = [context, command, self];
     let client = toBe(target, "Task task-name activated on channel channel.");
 
-    onMessageHandler(client, target, ...args);
+    onMessageHandler(client, target, ...args, null);
 
     const commandPartList = {
       say: "this is not a test",
@@ -215,10 +219,9 @@ describe("The 'say' command should", () => {
       command += commandPartList[modifiedType];
       args = [context, command, self];
       client = toBe(target, "Task task-name successfully modified.");
+      onMessageHandler(client, target, ...args, null);
 
-      onMessageHandler(client, target, ...args);
-
-      const db = fs.readFileSync(DB_PATH);
+      const db = fs.readFileSync(Tasks.databasePath);
       const [tasks] = JSON.parse(db);
       expect(Object.keys(tasks)).toHaveLength(1);
       expect(tasks).toHaveProperty(
@@ -244,18 +247,18 @@ describe("The 'say' command should", () => {
     let args = [context, command, self];
     let client = toBe(target, "Task task-name activated on channel channel.");
 
-    onMessageHandler(client, target, ...args);
+    onMessageHandler(client, target, ...args, null);
 
     const commandList = testSets.invalidModifyCommandList;
 
     commandList.forEach(type => {
       command = cmdName + type;
       args = [context, command, self];
-      client = toBe(target, say.modify);
+      client = toBe(target, description.modify);
 
-      onMessageHandler(client, target, ...args);
+      onMessageHandler(client, target, ...args, null);
 
-      const db = fs.readFileSync(DB_PATH);
+      const db = fs.readFileSync(Tasks.databasePath);
       const [tasks] = JSON.parse(db);
       expect(Object.keys(tasks)).toHaveLength(1);
       expect(tasks).toHaveProperty("task-name");
@@ -279,9 +282,9 @@ describe("The 'say' command should", () => {
     let args = [context, command, self];
     let client = toBe(target, "Task task-name activated on channel channel.");
 
-    onMessageHandler(client, target, ...args);
+    onMessageHandler(client, target, ...args, null);
 
-    let db = fs.readFileSync(DB_PATH);
+    let db = fs.readFileSync(Tasks.databasePath);
     let [tasks] = JSON.parse(db);
     expect(Object.keys(tasks)).toHaveLength(1);
 
@@ -289,9 +292,9 @@ describe("The 'say' command should", () => {
     args = [context, command, self];
     client = toBe(target, "Task task-name successfully removed.");
 
-    onMessageHandler(client, target, ...args);
+    onMessageHandler(client, target, ...args, null);
 
-    db = fs.readFileSync(DB_PATH);
+    db = fs.readFileSync(Tasks.databasePath);
     [tasks] = JSON.parse(db);
     expect(Object.keys(tasks)).toHaveLength(0);
   });
@@ -300,56 +303,70 @@ describe("The 'say' command should", () => {
     const command = cmdName + "clear task list";
     const args = [context, command, self];
     const client = toBe(target, "The task list has been wiped clean.");
-    onMessageHandler(client, target, ...args);
+    onMessageHandler(client, target, ...args, null);
 
-    const db = fs.readFileSync(DB_PATH);
+    const db = fs.readFileSync(Tasks.databasePath);
     expect(JSON.parse(db)).toEqual([{}]);
   });
 
   describe("handle JSON database error where", () => {
     test("there is an invalid JSON format", () => {
-      fs.writeFileSync(DB_PATH, "[{}}]");
+      fs.writeFileSync(Tasks.databasePath, "[{}}]");
 
-      const newTask = {
-        totalWaitInterval: 3600,
-        channel: "channel",
-        taskMessage: "test message"
-      };
+      const newTask = new Task("task-name", 3600, "channel", "test message");
 
-      const func = jest.spyOn(console, "error");
-      say.updateTaskList("task-name", "create", newTask);
-      expect(func).toHaveBeenCalledWith(
-        "Unexpected token } in JSON at position 3 for the file in path: "
-        + DB_PATH
-      );
+      try {
+        Tasks.createTask(newTask);
+      }
+      catch (err) {
+        if (!(err instanceof Error)) return;
+        expect(err.message).toBe(
+          "Unexpected token } in JSON at position 3 for the file in path: "
+          + Tasks.databasePath
+        );
+      }
     });
 
     test("the JSON database file does not exist", () => {
-      fs.rmSync(DB_PATH);
+      fs.rmSync(Tasks.databasePath);
 
-      const newTask = {
-        totalWaitInterval: 3600,
-        channel: "channel",
-        taskMessage: "test message"
-      };
+      const newTask = new Task("task-name", 3600, "channel", "test message");
 
-      const errorLog = jest.spyOn(console, "error");
-      say.updateTaskList("task-name", "create", newTask);
-      expect(errorLog).toHaveBeenCalledWith(
-        `ENOENT: no such file or directory, open '${DB_PATH}'`
-      );
+      try {
+        Tasks.createTask(newTask);
+      }
+      catch (err) {
+        if (!(err instanceof Error)) return;
+        expect(err.message).toBe(
+          "The local database doesn't exist or has been deleted: " +
+          Tasks.databasePath
+        );
+      }
     });
 
     describe("handle manual changes to JSOB DB directly where", () => {
       test("the entire task list is improperly structured", () => {
         testSets.invalidTaskListStructs.forEach(invalidTaskList => {
-          fs.writeFileSync(DB_PATH, JSON.stringify(invalidTaskList, null, 2));
+          fs.writeFileSync(
+            Tasks.databasePath, JSON.stringify(invalidTaskList, null, 2)
+          );
+
           const command = cmdName +
             "modify task-name say another test message";
           const args = [context, command, self];
           const client = toBe(target, "Invalid Task List.");
 
-          onMessageHandler(client, target, ...args);
+          try {
+            onMessageHandler(client, target, ...args, null);
+          }
+          catch (err) {
+            if (!(err instanceof Error)) return;
+            expect(err.message).toBe(
+              "Invalid Task List. " +
+              `Clear the task list using '${commandPrefix} clear task list'.` +
+              " Advanced: Either delete or manually format local DB."
+            );
+          }
         });
       });
     });
@@ -357,9 +374,9 @@ describe("The 'say' command should", () => {
 
 
   afterAll(() => {
-    if (fs.existsSync(DB_PATH)) {
-      fs.rmSync(DB_PATH); // Remove JSON database used for testing.
+    if (fs.existsSync(Tasks.databasePath)) {
+      fs.rmSync(Tasks.databasePath); // Remove JSON database used for testing.
     }
-    expect(fs.existsSync(DB_PATH)).toBeFalsy();
+    expect(fs.existsSync(Tasks.databasePath)).toBeFalsy();
   });
 });

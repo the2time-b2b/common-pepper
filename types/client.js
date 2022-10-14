@@ -21,7 +21,6 @@ class Client extends tmi.Client {
   constructor(opts) {
     super(opts);
     this.SEND_INTERVAL = process.env.SEND_INTERVAL || "30";
-    this.DUPMSG_CHAR = process.env.DUPMSG_CHAR;
   }
 
 
@@ -40,10 +39,10 @@ class Client extends tmi.Client {
    */
   say(responseState, messageState) {
     const nodeEnv = process.env.NODE_ENV || "dev";
-    const dupMsgChar = this.DUPMSG_CHAR;
     const sendInterval = parseInt(this.SEND_INTERVAL);
     const lastSent = messageState.messageLastSent;
     const bypassInterval = messageState.filterBypassInterval;
+
 
     /*
     * Prevents intentional/unintentional global cooldown.
@@ -53,14 +52,13 @@ class Client extends tmi.Client {
 
     if (elapsed >= sendInterval) {
       // Circumvents Twitch's duplicate message filter
-      if (
-        elapsed <= bypassInterval
-        && responseState.response === messageState.recentMessage
-        && nodeEnv !== "dev"
-      ) {
-        responseState.response +=
-          ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
+      const duplicateResponseFrequencyLimit = elapsed <= bypassInterval;
+      const isDuplicate = responseState.response === messageState.recentMessage;
+      const isDevEnv = nodeEnv !== "dev";
+      if (duplicateResponseFrequencyLimit && isDuplicate && isDevEnv) {
+        responseState.activateDuplicationFilterByass(true);
       }
+      else responseState.activateDuplicationFilterByass(false);
 
       if (nodeEnv === "live") {
         responseState.resends++;
