@@ -209,7 +209,7 @@ class Tasks {
       "name>\": {\n\t\t\t...\n\t\t}...\n\t}\n]";
 
     // eslint-disable-next-line max-len
-    const taskList = /^(\[{(("[a-zA-Z0-9_-]{3,40}":{("totalWaitInterval":\d+,"channel":"[a-zA-Z0-9_]{4,25}","taskMessage":"(([^"]|(\\"))*)")},){0,}("[a-zA-Z0-9_-]{3,40}":{("totalWaitInterval":\d+,"channel":"[a-zA-Z0-9_]{4,25}","taskMessage":"(([^"]|(\\"))*)")}))*}\])$/;
+    const taskList = /\[\{\}\]|^(\[\{(("[a-zA-Z0-9_-]{3,40}":\{("totalWaitInterval":\d+,"channel":"[a-zA-Z0-9_]{4,25}","taskMessage":"(([^"]|(\\"))*)")\},){0,}("[a-zA-Z0-9_-]{3,40}":\{("totalWaitInterval":\d+,"channel":"[a-zA-Z0-9_]{4,25}","taskMessage":"(([^"]|(\\"))*)")\}))\}\]|)$/;
 
     if (JSON.stringify(db).match(taskList)) return true;
 
