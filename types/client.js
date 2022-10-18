@@ -61,7 +61,7 @@ class Client extends tmi.Client {
       else responseState.activateDuplicationFilterByass(false);
 
       if (nodeEnv === "live") {
-        responseState.resends++;
+        responseState.resendCount++;
         return super.say(responseState.target, responseState.response);
       }
     }
@@ -71,7 +71,7 @@ class Client extends tmi.Client {
         reject(new CustomError.sendIntervalError(responseState.target));
       }
 
-      responseState.resends++;
+      responseState.resendCount++;
       resolve([responseState.target, responseState.response]); // For dev/test
     });
   }

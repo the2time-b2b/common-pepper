@@ -77,7 +77,7 @@ class Channel {
    * with the given username.
    */
   static checkChannel(username) {
-    if (!Object.keys(Channel.#channels).includes(username)) return true;
+    if (Object.keys(Channel.#channels).includes(username)) return true;
     return false;
   }
 
@@ -87,6 +87,17 @@ class Channel {
    */
   static clearChannels() {
     Channel.#channels = {};
+  }
+
+
+  /**
+   * Returns the bot's response queues for a channel.
+   * @param channel - Username of the channel.
+   * @returns {MessageQueue} - Response queue.
+   */
+  static getResponseQueue(channel) {
+    const user = Channel.getChannel(channel);
+    return user.getResponseQueue();
   }
 
 
@@ -211,7 +222,10 @@ class MessageQueue extends Queue {
    */
   enquqe(item) {
     // TODO: Dynamically change polling interval via commands
-    if (this.isEmpty()) this.#setIntervalID = setInterval(this.#callback, 5000);
+    if (this.isEmpty()) {
+      const pollingInterval = 5000;
+      this.#setIntervalID = setInterval(this.#callback, pollingInterval);
+    }
     super.enquqe(item);
   }
 

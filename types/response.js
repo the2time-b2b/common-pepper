@@ -40,14 +40,23 @@ class Response {
 
 
   /**
-   * @param {string} request - Raw request send by the user.
+   * @param {string} [request] - Raw request send by the user.
    * @param {string} target - Channel where the request was invoked.
    * @param {string} response - Bot response for the user request.
    */
-  constructor(request, target, response) {
+  constructor(request = null, target, response) {
+    const paramTypes = [typeof request, typeof target, typeof response];
+    paramTypes.forEach(paramType => {
+      if (paramType === "string") return;
+      if (request === null) return; // Cases where no explicit user requests.
+
+      const typeError = new TypeError("Supplied parameter must be a string.");
+      if (process.env.NODE_ENV === "test") console.error(typeError);
+      throw typeError;
+    });
+
     this.#request = request;
     this.#target = target;
-
     this.#response = response;
   }
 

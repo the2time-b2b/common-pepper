@@ -1,6 +1,7 @@
 const fs = require("fs");
-const path = require("path");
+const Scheduler = require("./scheduler");
 
+const path = require("path");
 const logger = require("../../../utils/logger");
 
 
@@ -24,6 +25,9 @@ class Tasks {
       if (!fs.existsSync(Tasks.#databasePath)) {
         Tasks.#createJSONDatabase();
       }
+
+      const tasks = Tasks.retrieveTasks();
+      Scheduler.init(tasks);
     }
     catch (err) { console.error(err); }
   })();
@@ -38,9 +42,7 @@ class Tasks {
    * Creates a new local database;
    */
   static #createJSONDatabase() {
-    if (fs.existsSync(Tasks.#databasePath)) {
-      throw new Error("The local database already exists.");
-    }
+    fs.writeFileSync(Tasks.#databasePath, JSON.stringify([{}], null, 4));
   }
 
 
@@ -107,10 +109,13 @@ class Tasks {
   static createTask(task) {
     const tasks = Tasks.retrieveTasks();
     if (tasks[task.name]) return `Task '${task.name}' already exists.`;
-    const dbStructure = [tasks];
-    tasks[task.name] = task.getDBStructuredRecord();
 
+    const dbStructure = [tasks];
+    const DBStructuredRecord = task.getDBStructuredRecord();
+    tasks[task.name] = DBStructuredRecord;
     Tasks.#storeTask(dbStructure);
+
+    Scheduler.addTask(DBStructuredRecord, task.name);
 
     return `Task ${task.name} activated on channel ${task.channel}.`;
   }
@@ -130,23 +135,28 @@ class Tasks {
       return `The task '${taskName}' does not exists.`;
     }
 
+    let modifiedTaskName;
+    let modifiedTask;
     if (task.name) {
       const oldTaskName = taskName;
-      const newTaskName = task.name;
-      if (newTaskName !== oldTaskName) {
-        tasks[newTaskName] = tasks[oldTaskName];
+      modifiedTaskName = task.name;
+      if (modifiedTaskName !== oldTaskName) {
+        modifiedTask = tasks[oldTaskName];
         delete tasks[oldTaskName]; // Deletes old task name
       }
     }
     else {
       const oldTask = tasks[taskName];
-      const modified = { ...oldTask, ...task.getDBStructuredRecord() };
-
-      tasks[taskName] = modified;
+      modifiedTaskName = taskName;
+      modifiedTask = { ...oldTask, ...task.getDBStructuredRecord() };
     }
+    Scheduler.removeTask(taskName);
 
+    tasks[modifiedTaskName] = modifiedTask;
     const dbStructure = [tasks];
     Tasks.#storeTask(dbStructure);
+
+    Scheduler.addTask(modifiedTask, modifiedTaskName);
 
     return `Task ${taskName} successfully modified.`;
   }
@@ -237,5 +247,5 @@ class Tasks {
   }
 }
 
-module.exports = Tasks;
 
+module.exports = Tasks;
