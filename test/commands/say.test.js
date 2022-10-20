@@ -4,17 +4,13 @@ const fs = require("fs");
 const Task = require("../../commands/main/say/task");
 const Tasks = require("../../commands/main/say/tasks");
 
-const { clientHandlers } = require("../../lib/handlers");
+const onMessageHandler = require("../../common-pepper");
 const { user: userEntitity } = require("../context");
 const testSets = require("./test-sets/say");
 const say = require("../../commands/main/say/index");
 const { toBe } = require("../helper");
 
 const description = require("../../commands/main/say/description");
-
-
-
-const onMessageHandler = clientHandlers.onMessageHandler;
 
 
 describe("The 'say' command should", () => {

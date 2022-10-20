@@ -7,30 +7,30 @@ const { opts } = require("./../../../config");
 const logger = require("./../../../utils/logger");
 
 
-const client = new Client(opts);
-client.on("connected", function(addr, port) {
-  logger.info(`* Scheduler for 'say' command connected to ${addr}:${port}`);
-});
-if (process.env.NODE_ENV !== "test") client.connect();
-
-
 class Scheduler {
   static #scheduler = new ToadScheduler();
+  static #client = new Client(opts);
 
 
   /**
-   * Initialize any saved tasks from the local JSON database when the program is
-   * started or restarted.
+   * Initialize any saved tasks from the local JSON database.
    * @param {import("./typedefs").DBTasks} tasks Tasks from the local JSON
    * database that is to be initialized.
    */
   static init(tasks) {
     if (process.env.NODE_ENV === "test") return;
 
-    for (const taskName in tasks) {
-      const task = tasks[taskName];
-      Scheduler.addTask(task, taskName);
-    }
+    this.#client.on("connected", function(addr, port) {
+      logger.info(`* Scheduler for 'say' command connected to ${addr}:${port}`);
+    });
+    this.#client.connect()
+      .then(() => {
+        for (const taskName in tasks) {
+          const task = tasks[taskName];
+          Scheduler.addTask(task, taskName);
+        }
+      })
+      .catch(err => { throw new Error(err); });
   }
 
 
@@ -49,7 +49,23 @@ class Scheduler {
 
     let user;
     const isUserStateTracked = Channel.checkChannel(username);
-    if (!isUserStateTracked) user = new Channel(client, username);
+    if (!isUserStateTracked) {
+      try {
+        user = new Channel(this.#client, username);
+      }
+      catch (err) {
+        if (err instanceof Error) {
+          if (err.message === "Listner is not defined.") {
+            console.error(err);
+            process.exit(1);
+          }
+          throw err;
+        }
+
+        console.error(new Error("Unexpected Error"));
+        process.exit(1);
+      }
+    }
     else user = Channel.getChannel(username);
 
     const responseQueue = user.getResponseQueue();

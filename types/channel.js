@@ -1,14 +1,21 @@
-const Queue = require("../types/queue");
+const Client = require("./client");
+const Queue = require("./queue");
 const clientResponse = require("../lib/response");
+const logger = require("../utils/logger");
+const { opts } = require("../config");
 
 
 /**
  * Monitor and manage the state of each channel in which the bot resides.
- * @class
- * @constructor
  */
 class Channel {
   static #channels = {};
+
+
+  /**
+   * @type {Client}
+   */
+  #listner = null;
 
 
   /**
@@ -40,18 +47,36 @@ class Channel {
 
 
   /**
+   * Monitor and manage the state of each channel in which the bot resides.
    * @param {import("../types/client")} client - Bot's instance.
    * @param {string} username - Username of the channel.
    * @param {number} [resendLimit=3] -  Number of resends before the response is
    * dequeued automatically.
    */
   constructor(client, username, resendLimit) {
+    const isChannelExists = Channel.checkChannel(username);
+    if (isChannelExists) throw new Error(`'${username}' state already exists.`);
+
     this.#username = username;
     if (resendLimit) this.#resendLimit;
     this.#responseQueue = new MessageQueue(() => {
       responseQueueManager(this, client, this.#resendLimit);
     });
     Channel.#channels[this.#username] = this;
+
+    const listner = new Client({ ...opts, channels: [username] });
+    const onListenHandler = this.onListenHandler.bind(this);
+    listner.on("message", onListenHandler);
+
+
+    listner.on("connected", function(addr, port) {
+      logger.info(`* Listner connected on ${username} to ${addr}:${port}`);
+    });
+    if (process.env.NODE_ENV !== "test") {
+      listner.connect().catch(err => console.error(err));
+    }
+
+    this.#listner = listner;
   }
 
 
@@ -114,6 +139,41 @@ class Channel {
    */
   getResponseQueue() {
     return this.#responseQueue;
+  }
+
+
+  /**
+   * Monitor bot responses.
+   * @param {string} channel Username of the channel.
+   * @param {import("tmi.js").CommonUserstate} context Meta data of the user who
+   * message picked up by the listner.
+   * @param {string} message Bot message/response picked up by the listener on a
+   * target channel.
+   */
+  onListenHandler(channel, context, message) {
+    const listenedUsername = String(context["display-name"]).toLowerCase();
+    if (!(listenedUsername === process.env.USERNAME)) return;
+
+    if (this.#responseQueue.isEmpty()) return;
+    const responseState = this.#responseQueue.retrieve();
+    const response = responseState.response;
+    const request = responseState.request;
+    const target = responseState.target;
+
+    if (channel !== target) {
+      const msg = `Response intended for ${target} was targeted to ${channel}`;
+      throw new Error(msg);
+    }
+
+    if (message !== response) return;
+
+    logger.info(`\n* Executed "${request}" command`);
+    logger.info("* Details:", { target, response });
+
+    const messageState = this.getMessageState();
+    messageState.nextMessageState(message, Date.now());
+
+    this.#responseQueue.dequqe();
   }
 }
 

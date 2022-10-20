@@ -1,10 +1,10 @@
 // Define configuration options
 module.exports = {
   identity: {
-    username: process.env.BOT_USERNAME,
-    password: process.env.BOT_TOKEN
+    username: process.env.USERNAME.toLowerCase(),
+    password: process.env.TOKEN
   },
   channels: [
-    process.env.CHANNEL
+    process.env.CHANNEL.toLowerCase()
   ]
 };

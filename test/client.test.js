@@ -9,7 +9,7 @@ const client = new Client({}); // Dummy options
 const testMessageState = new MessageState();
 
 beforeEach(() => {
-  client.SEND_INTERVAL = 0; // Preset cooldown prevention interferes with test.
+  client.changeMessageInterval(0); // Preset interval interferes with test.
   testMessageState.nextMessageState(null, null);
   jest.clearAllMocks();
 });
@@ -61,7 +61,7 @@ describe("watch the set SEND_INTERVAL value and respond if", () => {
   beforeAll(() => { jest.useFakeTimers(); });
 
   it("elapsed time is more than set value for consecutive request", async() => {
-    client.SEND_INTERVAL = 20;
+    client.changeMessageInterval(20);
 
     await testClientResponse(message);
 
@@ -98,13 +98,14 @@ async function testClientResponse(
   let response;
 
   try {
-    const responseState = new Response(null, channel, (message));
+    const username = channel.substring(1);
+    const responseState = new Response(null, username, message);
     response = await client.say(responseState, testMessageState);
     testMessageState.nextMessageState(message, Date.now());
   }
   catch (err) {
     if (rejection) {
-      expect(err.name).toBe("sendIntervalError");
+      expect(err.name).toBe("messageIntervalError");
       return;
     }
   }

@@ -65,17 +65,13 @@ class Response {
    * Raw request send by the user.
    * @readonly
    */
-  get request() {
-    return this.#request;
-  }
+  get request() { return this.#request; }
 
   /**
    * Channel where the request was invoked.
    * @readonly
    */
-  get target() {
-    return this.#target;
-  }
+  get target() { return `#${this.#target}`; }
 
   /**
    * Channel where the request was invoked.
@@ -88,6 +84,7 @@ class Response {
     const bypassChar = ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
     return this.#response + bypassChar;
   }
+
 
   activateDuplicationFilterByass(isActive) {
     if (isActive) {

@@ -1,26 +1,36 @@
 const tmi = require("tmi.js");
 
-const CustomError = require("../utils/error");
 
-
-/**
- * @class
- * @extends tmi.Client
- * @constructor
- * @member {number} SEND_INTERVAL - Cooldown period between two consecutive
- * bot responses.
- * @member {string} DUPMSG_CHAR - Character appended to bot's response to bypass
- * twitch's duplicate message filter.
- */
-class Client extends tmi.Client {
+module.exports = class Client extends tmi.Client {
   /**
-   * @param {param} opts
+   * Cooldown period between two consecutive bot responses.
+   * @type {number}
+  */
+  #messageInterval = 30;
+
+
+  /**
+   * @param {import("tmi.js").Options} opts
    * - Client connection options.
    * - docs: https://tmijs.com/#guide-options
    */
   constructor(opts) {
     super(opts);
-    this.SEND_INTERVAL = process.env.SEND_INTERVAL || "30";
+
+    const messageInterval = process.env.MESSAGE_INTERVAL;
+    if (!messageInterval) {
+      const error = new Error();
+      error.message = "Environment variable 'MESSAGE_INTERVAL' is not defined";
+      throw error;
+    }
+
+    const parsedMessageInterval = parseInt(messageInterval);
+    if (isNaN(parsedMessageInterval)) {
+      const error = new Error();
+      error.message = "Environment variable 'MESSAGE_INTERVAL' is not a number";
+      throw error;
+    }
+    this.#messageInterval = parsedMessageInterval;
   }
 
 
@@ -39,7 +49,7 @@ class Client extends tmi.Client {
    */
   say(responseState, messageState) {
     const nodeEnv = process.env.NODE_ENV || "dev";
-    const sendInterval = parseInt(this.SEND_INTERVAL);
+    const messageInterval = this.#messageInterval;
     const lastSent = messageState.messageLastSent;
     const bypassInterval = messageState.filterBypassInterval;
 
@@ -48,9 +58,11 @@ class Client extends tmi.Client {
     * Prevents intentional/unintentional global cooldown.
     * DUPMSG_STATUS initially set to null for first bot's message after reset
     */
-    const elapsed = lastSent ? ((Date.now() - lastSent) / 1000) : sendInterval;
+    const elapsed = lastSent
+      ? ((Date.now() - lastSent) / 1000)
+      : messageInterval;
 
-    if (elapsed >= sendInterval) {
+    if (elapsed >= messageInterval) {
       // Circumvents Twitch's duplicate message filter
       const duplicateResponseFrequencyLimit = elapsed <= bypassInterval;
       const isDuplicate = responseState.response === messageState.recentMessage;
@@ -67,15 +79,26 @@ class Client extends tmi.Client {
     }
 
     return new Promise((resolve, reject) => {
-      if (elapsed < sendInterval) {
-        reject(new CustomError.sendIntervalError(responseState.target));
+      if (elapsed < messageInterval) {
+        const error = new Error();
+        error.name = "messageIntervalError";
+        error.message = "Message is being sent too quickly.";
+
+        reject(error);
       }
 
       responseState.resendCount++;
       resolve([responseState.target, responseState.response]); // For dev/test
     });
   }
-}
 
 
-module.exports = Client;
+  /**
+   * Change the rate at which the message in sent on every channel, in seconds.
+   * @param {number} seconds Number of seconds to wait before sending next
+   * consecutive message.
+   */
+  changeMessageInterval(seconds) {
+    this.#messageInterval = seconds;
+  }
+};
