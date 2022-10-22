@@ -49,7 +49,7 @@ client.on("message", function() {
  * @param {import("./types/client")} client - Bot's instance.
  * @param {string} target - A '#' prefiex username of the channel where the
  * command/message * originated from.
- * @param {import("tmi.js").CommonUserstate} context - The chat state of the
+ * @param {import("tmi.js").ChatUserstate} context - The chat state of the
  * user who sent the command/message.
  * @param {string} msg - The command/message on the target channel.
  * @param {boolean} self - Flag that specifies whether command/message orignated
@@ -98,7 +98,7 @@ function onMessageHandler(client, target, context, msg, self) {
   }
 
   const responseQueue = Channel.getResponseQueue(channel);
-  responseQueue.enquqe(responseState);
+  responseQueue.enqueue(responseState);
 }
 
 

@@ -13,6 +13,7 @@ class Channel {
 
 
   /**
+   * A unique listner on a channel to manage responses sent by the bot on chat.
    * @type {Client}
    */
   #listner = null;
@@ -27,10 +28,10 @@ class Channel {
 
   /**
    *  Bot response queue of the channel.
-   * @type {MessageQueue}
+   * @type {Queue}
    * @private
    */
-  #responseQueue = null;
+  #responseQueue = new Queue();
 
   /**
    * Current message state of a channel.
@@ -44,6 +45,13 @@ class Channel {
    * @type {number}
    */
   #resendLimit = 3;
+
+  /**
+   * A unique interval ID which identifies the timer created by the setInterval
+   * method invocation.
+   * @type {number}
+   */
+  #setIntervalID = null;
 
 
   /**
@@ -59,9 +67,32 @@ class Channel {
 
     this.#username = username;
     if (resendLimit) this.#resendLimit;
-    this.#responseQueue = new MessageQueue(() => {
-      responseQueueManager(this, client, this.#resendLimit);
-    });
+
+    /**
+     * Orderly manage multiple bot responses on a channel.
+     * The queue is polled every set interval and is activated or deactivated
+     * based on the presence of atleast one response in a queue.
+     */
+    const beforeEnqueueCallback = function() {
+      if (this.#responseQueue.isEmpty()) {
+        const pollingInterval = 5000;
+        this.#setIntervalID = setInterval(
+          () => { responseQueueManager(this, client, this.#resendLimit); },
+          pollingInterval
+        );
+      }
+    };
+    this.#responseQueue.beforeEnqueue(beforeEnqueueCallback.bind(this));
+
+    const afterDequeueCallback = function() {
+      if (this.#responseQueue.isEmpty()) {
+        clearInterval(this.#setIntervalID);
+        this.#setIntervalID = null;
+      }
+    };
+    this.#responseQueue.afterDequeue(afterDequeueCallback.bind(this));
+
+
     Channel.#channels[this.#username] = this;
 
     const listner = new Client({ ...opts, channels: [username] });
@@ -118,7 +149,7 @@ class Channel {
   /**
    * Returns the bot's response queues for a channel.
    * @param channel - Username of the channel.
-   * @returns {MessageQueue} - Response queue.
+   * @returns {Queue} - Response queue.
    */
   static getResponseQueue(channel) {
     const user = Channel.getChannel(channel);
@@ -135,7 +166,7 @@ class Channel {
 
   /**
    * Returns the bot's response queues for a this channel.
-   * @returns {MessageQueue} - Response queue.
+   * @returns {Queue} - Response queue.
    */
   getResponseQueue() {
     return this.#responseQueue;
@@ -173,7 +204,7 @@ class Channel {
     const messageState = this.getMessageState();
     messageState.nextMessageState(message, Date.now());
 
-    this.#responseQueue.dequqe();
+    this.#responseQueue.dequeue();
   }
 }
 
@@ -241,80 +272,6 @@ class MessageState {
 
 
 /**
- * Orderly manage multiple bot responses on a channel.
- * @description
- * - The queue is polled every set interval and callback is invoked each cycle.
- * - The poll is activated or deactivated based on the presence of atleast one
- * response in a queue.
- */
-class MessageQueue extends Queue {
-  /**
-   * Function to called every set interval based on the number of response in
-   * the queue.
-   * @type {Function}
-   */
-  #callback = null;
-
-  /**
-   * A unique interval ID which identifies the timer created by the setInterval
-   * method invocation.
-   * @type {number}
-   */
-  #setIntervalID = null;
-
-
-  /**
-   * @param {Function} callback
-   * - A callback function to be invoked at every set interval based on the
-   * presence of atleast one response in a queue.
-   */
-  constructor(callback) {
-    super();
-    this.#callback = callback;
-  }
-
-
-  /**
-   * Insert multiple bot responses in a queue.
-   * @param {import("./response")} item - Bot response instance.
-   * @description Enables the recurring callback invocation if there are more
-   * than one response in a queue.
-   */
-  enquqe(item) {
-    // TODO: Dynamically change polling interval via commands
-    if (this.isEmpty()) {
-      const pollingInterval = 5000;
-      this.#setIntervalID = setInterval(this.#callback, pollingInterval);
-    }
-    super.enquqe(item);
-  }
-
-
-  /**
-   * Removes bot responses from the queue.
-   * @description Disables the recurring callback invocation if there are no
-   * response in the queue.
-   */
-  dequqe() {
-    super.dequqe();
-    if (this.isEmpty()) {
-      clearInterval(this.#setIntervalID);
-      this.#setIntervalID = null;
-    }
-  }
-
-
-  /**
-   * Retrieves a bot response instance.
-   * @returns {import("./response")}
-   */
-  retrieve() {
-    return super.retrieve();
-  }
-}
-
-
-/**
    * Enables the retrieval and processing of the channel's response queue.
    * @description The retrieval and processing of the channel's response queue
    * is done with the help of the setInterval() method where the response queue
@@ -333,7 +290,7 @@ function responseQueueManager(channel, client, resendLimit) {
   let responseState = responseQueue.retrieve();
 
   if (responseState.resendCount > resendLimit) {
-    responseQueue.dequqe();
+    responseQueue.dequeue();
     if (responseQueue.isEmpty()) return;
     responseState = responseQueue.retrieve();
   }
@@ -346,9 +303,9 @@ function responseQueueManager(channel, client, resendLimit) {
   clientResponse(client, channel.getMessageState(), responseState);
 
   if (!(process.env.NODE_ENV === "live")) {
-    responseQueue.dequqe();
+    responseQueue.dequeue();
   }
 }
 
 
-module.exports = { Channel, MessageState, MessageQueue };
+module.exports = { Channel, MessageState };

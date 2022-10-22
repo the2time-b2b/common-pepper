@@ -73,7 +73,7 @@ class Scheduler {
     const toadTask = new Task("Recurring Bot Response", () => {
       const request = "[scheduler -> command: say] Invoking task name: " + name;
       const response = new Response(request, username, message);
-      responseQueue.enquqe(response);
+      responseQueue.enqueue(response);
     });
 
     const job = new SimpleIntervalJob({ seconds: interval }, toadTask, name);
