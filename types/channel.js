@@ -1,5 +1,6 @@
 const Client = require("./client");
 const Queue = require("./queue");
+
 const clientResponse = require("../lib/response");
 const logger = require("../utils/logger");
 const { opts } = require("../config");
@@ -9,6 +10,10 @@ const { opts } = require("../config");
  * Monitor and manage the state of each channel in which the bot resides.
  */
 class Channel {
+  /**
+   * Stores all instantiated channels.
+   * @type {{[username: string]: Channel}}
+   */
   static #channels = {};
 
 
@@ -16,8 +21,7 @@ class Channel {
    * A unique listner on a channel to manage responses sent by the bot on chat.
    * @type {Client}
    */
-  #listner = null;
-
+  #listner = new Client({ ...opts, channels: [] });
 
   /**
    * Username of the channel.
@@ -77,7 +81,22 @@ class Channel {
       if (this.#responseQueue.isEmpty()) {
         const pollingInterval = 5000;
         this.#setIntervalID = setInterval(
-          () => { responseQueueManager(this, client, this.#resendLimit); },
+          () => {
+            try {
+              responseQueueManager(this, client, this.#resendLimit);
+            }
+            catch (err) {
+              if (!(err instanceof Error)) throw new Error("Unhandled error.");
+
+              const responseState = this.#responseQueue.retrieve();
+              const request = responseState.request;
+              const target = responseState.target;
+              const response = responseState.response;
+              logger.info(`\n* Could not execute "${request}" command`);
+              logger.info("* Details:", { target, response });
+              console.error(err.message);
+            }
+          },
           pollingInterval
         );
       }
@@ -92,23 +111,30 @@ class Channel {
     };
     this.#responseQueue.afterDequeue(afterDequeueCallback.bind(this));
 
+    this.#listner = new Client({ ...opts, channels: [username] });
+    const onListenHandler = this.#onListenHandler.bind(this);
+    this.#listner.on("message", onListenHandler);
 
-    Channel.#channels[this.#username] = this;
-
-    const listner = new Client({ ...opts, channels: [username] });
-    const onListenHandler = this.onListenHandler.bind(this);
-    listner.on("message", onListenHandler);
-
-
-    listner.on("connected", function(addr, port) {
+    this.#listner.on("connected", (addr, port) => {
       logger.info(`* Listner connected on ${username} to ${addr}:${port}`);
     });
+    this.#listner.on("join", (channel) => {
+      const nonPrefixedUsername = channel.substring(1);
+      if (nonPrefixedUsername !== this.#username)
+        throw new Error("Channel should and can have only one unique Listner.");
+    });
     if (process.env.NODE_ENV !== "test") {
-      listner.connect().catch(err => console.error(err));
+      this.#listner.connect().catch(err => console.error(err));
     }
 
-    this.#listner = listner;
+    Channel.#channels[this.#username] = this;
   }
+
+
+  /**
+   * The username of a channel.
+   */
+  get username() { return this.#username; }
 
 
   /**
@@ -158,22 +184,6 @@ class Channel {
 
 
   /**
-   * Get the current message state of the channel.
-   * @returns {MessageState} - Current message state of the channel.
-   */
-  getMessageState() { return this.#messageState; }
-
-
-  /**
-   * Returns the bot's response queues for a this channel.
-   * @returns {Queue} - Response queue.
-   */
-  getResponseQueue() {
-    return this.#responseQueue;
-  }
-
-
-  /**
    * Monitor bot responses.
    * @param {string} channel Username of the channel.
    * @param {import("tmi.js").CommonUserstate} context Meta data of the user who
@@ -181,7 +191,7 @@ class Channel {
    * @param {string} message Bot message/response picked up by the listener on a
    * target channel.
    */
-  onListenHandler(channel, context, message) {
+  #onListenHandler(channel, context, message) {
     const listenedUsername = String(context["display-name"]).toLowerCase();
     if (!(listenedUsername === process.env.USERNAME)) return;
 
@@ -205,6 +215,34 @@ class Channel {
     messageState.nextMessageState(message, Date.now());
 
     this.#responseQueue.dequeue();
+  }
+
+
+  /**
+   * Check if a listner exists on the channel.
+   * @returns {Boolean} The status of the existance of listner in the channel.
+   */
+  checkListner() {
+    const [channel] = this.#listner.getChannels();
+    const username = channel.substring(1);
+    if (username === this.#username) return true;
+    return false;
+  }
+
+
+  /**
+   * Get the current message state of the channel.
+   * @returns {MessageState} - Current message state of the channel.
+   */
+  getMessageState() { return this.#messageState; }
+
+
+  /**
+   * Returns the bot's response queues for a this channel.
+   * @returns {Queue} - Response queue.
+   */
+  getResponseQueue() {
+    return this.#responseQueue;
   }
 }
 
@@ -276,18 +314,20 @@ class MessageState {
    * @description The retrieval and processing of the channel's response queue
    * is done with the help of the setInterval() method where the response queue
    * is polled every set interval, in ms.
-   * @param {import("../types/channel").Channel} channel - Bot's instance.
+   * @param {import("../types/channel").Channel} channelState - Current state of
+   * a channel.
    * @param {import("../types/client")} client - Bot's instance.
    * @param {number} resendLimit -  Number of times a response resent before it
    * is removed from the queue automatically.
    * @returns {number} - An interval ID which uniquely identifies the timer
    * created by the call to setInterval().
    */
-function responseQueueManager(channel, client, resendLimit) {
-  const responseQueue = channel.getResponseQueue();
+function responseQueueManager(channelState, client, resendLimit) {
+  const responseQueue = channelState.getResponseQueue();
   if (responseQueue.isEmpty()) return;
 
   let responseState = responseQueue.retrieve();
+
 
   if (responseState.resendCount > resendLimit) {
     responseQueue.dequeue();
@@ -295,13 +335,17 @@ function responseQueueManager(channel, client, resendLimit) {
     responseState = responseQueue.retrieve();
   }
 
+  const isListnerExists = channelState.checkListner();
+  if (!isListnerExists) {
+    throw new Error(`Listner not connected to ${channelState.username}`);
+  }
+
   /**
    * During dev/test environment, the command response would not be sent to
    * twitch IRC server. Therefore, listner would not be able to pick up any
    * of the bot's response.
    */
-  clientResponse(client, channel.getMessageState(), responseState);
-
+  clientResponse(client, channelState.getMessageState(), responseState);
   if (!(process.env.NODE_ENV === "live")) {
     responseQueue.dequeue();
   }

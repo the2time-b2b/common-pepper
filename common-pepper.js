@@ -51,14 +51,19 @@ client.on("message", function() {
  * command/message * originated from.
  * @param {import("tmi.js").ChatUserstate} context - The chat state of the
  * user who sent the command/message.
- * @param {string} msg - The command/message on the target channel.
+ * @param {string} request - The command/message on the target channel.
  * @param {boolean} self - Flag that specifies whether command/message orignated
  * from the current bot's instance.
 
  */
-function onMessageHandler(client, target, context, msg, self) {
+function onMessageHandler(client, target, context, request, self) {
   const channel = target.substring(1);
   if (self) return; // Ignore messages from the handler's bot (client) instance.
+
+  // Ignore request that are not command (non-prefixed messages).
+  const prefix = process.env.PREFIX;
+  const prefixLength = prefix.length;
+  if (!(request.substring(0, prefixLength) === prefix)) return;
 
   if (process.env.NODE_ENV !== "test") {
     const username = context["display-name"].toLowerCase();
@@ -70,22 +75,18 @@ function onMessageHandler(client, target, context, msg, self) {
     }
   }
 
-  // Ignore non-prefixed messages
-  const prefix = process.env.PREFIX;
-  const prefixLength = prefix.length;
-  if (!(msg.substring(0, prefixLength) === prefix)) return;
-  const command = msg;
+  logger.info(`\n* Raw request "${request}" Received`);
 
   /*
   * Trims whitespace on either side of the chat message and replaces
   * multiple whitespaces, tabs or newlines between words with just
   * one whitespace.
   */
-  const request = command.trim().replace(/\s\s+/g, " ").split(" ");
-  logger.info(`\n* Raw request "${command}" Received`);
+  const splitModifiedRequest = request.trim().replace(/\s\s+/g, " ").split(" ");
+  const modifiedRequest = splitModifiedRequest.join(" ");
 
-  const botResponse = execCmd(prefix, context, request);
-  const responseState = new Response(request.join(" "), channel, botResponse);
+  const botResponse = execCmd(prefix, context, splitModifiedRequest);
+  const responseState = new Response(modifiedRequest, channel, botResponse);
 
   /*
     Note: Introduction of response queues breaks current message handler
