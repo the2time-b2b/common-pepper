@@ -1,7 +1,10 @@
+/**
+ * @template T
+ */
 class Queue {
   /**
    * An array of items respresented as a queue.
-   * @type {Array<any>}
+   * @type {Array<T>}
    */
   #queue = [];
 
@@ -18,6 +21,10 @@ class Queue {
   #afterDequeueCallback = null;
 
 
+  /**
+   * Inserts an item of a specific type to the queue.
+   * @param {T} item An item to be inserted at the last in a queue.
+   */
   enqueue(item) {
     if (!item) throw new Error("An item to be enqueue is missing.");
     if (this.#beforeEnqueueCallback) this.#beforeEnqueueCallback();
@@ -25,6 +32,9 @@ class Queue {
   }
 
 
+  /**
+   * Removes the first item from the queue.
+   */
   dequeue() {
     if (this.#queue.length > 0) {
       this.#queue.shift();
@@ -34,12 +44,20 @@ class Queue {
   }
 
 
+  /**
+   * Retrieve an item of a specific type from the queue.
+   * @returns {T} First item from the queue.
+   */
   retrieve() {
     if (this.#queue.length > 0) return this.#queue[0];
     throw new Error("Cannot retrieve an item from an empty queue.");
   }
 
 
+  /**
+   * Checks if the the queue is empty.
+   * @returns {Boolean}
+   */
   isEmpty() {
     if (this.#queue.length === 0) return true;
     return false;

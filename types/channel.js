@@ -32,7 +32,7 @@ class Channel {
 
   /**
    *  Bot response queue of the channel.
-   * @type {Queue}
+   * @type {Queue<import("./response")>}
    * @private
    */
   #responseQueue = new Queue();
@@ -175,7 +175,7 @@ class Channel {
   /**
    * Returns the bot's response queues for a channel.
    * @param channel - Username of the channel.
-   * @returns {Queue} - Response queue.
+   * @returns {Queue<import("./response")>} - Response queue.
    */
   static getResponseQueue(channel) {
     const user = Channel.getChannel(channel);
@@ -239,7 +239,7 @@ class Channel {
 
   /**
    * Returns the bot's response queues for a this channel.
-   * @returns {Queue} - Response queue.
+   * @returns {Queue<import("./response")>} - Response queue.
    */
   getResponseQueue() {
     return this.#responseQueue;
