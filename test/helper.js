@@ -1,11 +1,12 @@
 /**
  * Custom Jest matcher containing `expect`-`toBe` pairs to check if the bot
  * response in the specified target channel is what you expect.
- * @param {string} expectedTarget Expected target channel in the format
+ * @param {string} target Expected target channel in the format
  * `#<channel>`.
- * @param {string} expectedResponse Expected bot response.
+ * @param {string} response Expected bot response.
+ * @param {string} [request] Expected bot request.
  */
-function toBe(expectedTarget, expectedResponse) {
+function toBe(target, response, request) {
   return {
     /**
    * Override the client object's `say` method.
@@ -13,8 +14,9 @@ function toBe(expectedTarget, expectedResponse) {
    * response.
    */
     say: (responseState) => {
-      expect(responseState.target).toBe(expectedTarget);
-      expect(responseState.response).toBe(expectedResponse);
+      expect(responseState.target).toBe(target);
+      if (response) expect(responseState.response).toBe(response);
+      if (request) expect(responseState.request).toBe(request);
     }
   };
 }

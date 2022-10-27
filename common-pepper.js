@@ -4,7 +4,7 @@ const Client = require("./types/client");
 const { Channel } = require("./types/channel");
 const Response = require("./types/response");
 
-const execCmd = require("./lib/command");
+const executeCommand = require("./commands");
 const clientResponse = require("./lib/response");
 const { opts } = require("./config");
 const logger = require("./utils/logger");
@@ -32,9 +32,7 @@ client.on("message", function() {
   }
 
   try {
-    onMessageHandler(
-      client, channel, context, message, self
-    );
+    onMessageHandler(client, channel, context, message, self);
   }
   catch (err) {
     logger.info("* Command could not be executed: " + message);
@@ -46,6 +44,8 @@ client.on("message", function() {
 
 /**
  * Handle user requests.
+ * @description Leading and trailing whitespaces are already pre-trimmed by the
+ * incoming requests.
  * @param {import("./types/client")} client - Bot's instance.
  * @param {string} target - A '#' prefiex username of the channel where the
  * command/message * originated from.
@@ -54,7 +54,6 @@ client.on("message", function() {
  * @param {string} request - The command/message on the target channel.
  * @param {boolean} self - Flag that specifies whether command/message orignated
  * from the current bot's instance.
-
  */
 function onMessageHandler(client, target, context, request, self) {
   const channel = target.substring(1);
@@ -73,9 +72,10 @@ function onMessageHandler(client, target, context, request, self) {
       logger.info(`* ${username} has no privilege to execute any command.`);
       return;
     }
+
+    logger.info(`\n* Raw request "${request}" Received`);
   }
 
-  logger.info(`\n* Raw request "${request}" Received`);
 
   /*
   * Trims whitespace on either side of the chat message and replaces
@@ -85,7 +85,7 @@ function onMessageHandler(client, target, context, request, self) {
   const splitModifiedRequest = request.trim().replace(/\s\s+/g, " ").split(" ");
   const modifiedRequest = splitModifiedRequest.join(" ");
 
-  const botResponse = execCmd(prefix, context, splitModifiedRequest);
+  const botResponse = executeCommand(context, splitModifiedRequest);
   const responseState = new Response(modifiedRequest, channel, botResponse);
 
   /*
