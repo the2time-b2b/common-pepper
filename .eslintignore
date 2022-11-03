@@ -1,0 +1,5 @@
+# Self.
+.eslintrc.js
+
+# Build directory.
+build/

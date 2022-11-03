@@ -1,50 +1,29 @@
 /**
  * A response state for a particular user request on a target channel.
- * @class
- * @constructor
  */
-class Response {
-  /**
-   * Raw request send by the user.
-   * @type {string}
-   */
-  #request = null;
+export default class BotResponse {
+  /** Raw request send by the user. */
+  #request: string;
 
-  /**
-   * Channel where the request was invoked.
-   * @type {string}
-   */
-  #target = null;
+  /** Channel where the request was invoked. */
+  #target: string;
 
+  /** Bot response for the user request. */
+  #response: string;
 
-  /**
-   * Bot response for the user request.
-   * @type {string}
-   * @public
-   */
-  #response = null;
-
-  /**
-   * Indicate whether the current response to be sent is duplicate of the
-   * response that was previously sent.
-   * @type {boolean}
-   */
+  /** Indicate whether the response is duplicate of the one previously sent. */
   #isDuplicate = false;
 
-  /**
-   * Number of times the response has been resent.
-   * @public
-   * @type {number}
-   */
+  /** Number of times the response has been resent. */
   resendCount = 0;
 
 
   /**
-   * @param {string} [request] - Raw request send by the user.
-   * @param {string} target - Channel where the request was invoked.
-   * @param {string} response - Bot response for the user request.
+   * @param request - Raw request send by the user.
+   * @param target - Channel where the request was invoked.
+   * @param response - Bot response for the user request.
    */
-  constructor(request = null, target, response) {
+  constructor(request: string, target: string, response: string) {
     const paramTypes = [typeof request, typeof target, typeof response];
     paramTypes.forEach(paramType => {
       if (paramType === "string") return;
@@ -65,28 +44,37 @@ class Response {
    * Raw request send by the user.
    * @readonly
    */
-  get request() { return this.#request; }
+  get request(): string { return this.#request; }
 
   /**
    * Channel where the request was invoked.
    * @readonly
    */
-  get target() { return `#${this.#target}`; }
+  get target(): string { return `#${this.#target}`; }
 
   /**
    * Channel where the request was invoked.
    * @readonly
    */
-  get response() {
+  get response(): string {
     if (!this.#isDuplicate) return this.#response;
 
     const dupMsgChar = process.env.DUPMSG_CHAR;
+    if (!dupMsgChar) {
+      throw new Error("Environment variable 'DUPMSG_CHAR' is not set.");
+    }
+
     const bypassChar = ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
     return this.#response + bypassChar;
   }
 
 
-  activateDuplicationFilterByass(isActive) {
+  /**
+   * Control when message duplication filter should be bypassed.
+   * @param isActive Indicate whether the current response should bypass the
+   * message duplication filter.
+   */
+  activateDuplicationFilterByass(isActive: boolean): void {
     if (isActive) {
       if (!this.#isDuplicate) this.#isDuplicate = !this.#isDuplicate;
     }
@@ -95,6 +83,3 @@ class Response {
     }
   }
 }
-
-
-module.exports = Response;

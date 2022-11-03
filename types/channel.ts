@@ -1,71 +1,50 @@
-const Client = require("./client");
-const Queue = require("./queue");
+import Client from "./client";
+import Queue from "./queue";
 
-const clientResponse = require("../lib/response");
-const logger = require("../utils/logger");
-const { opts } = require("../config");
+import type { ChatUserstate } from "tmi.js";
+import type BotResponse from "./response";
+
+import * as logger from "../utils/logger";
+import clientResponse from "../lib/response";
+import { opts } from "../config/index";
 
 
-/**
- * Monitor and manage the state of each channel in which the bot resides.
- */
+/** Monitor and manage the state of each channel in which the bot resides. */
 class Channel {
-  /**
-   * Stores all instantiated channels.
-   * @type {{[username: string]: Channel}}
-   */
-  static #channels = {};
+  /** Stores all instantiated channels. */
+  static #channels: { [username: string]: Channel } = {};
 
 
-  /**
-   * A unique listner on a channel to manage responses sent by the bot on chat.
-   * @type {Client}
-   */
-  #listner = new Client({ ...opts, channels: [] });
+  /** A unique listner on a channel to manage responses sent by the bot. */
+  #listner: Client = new Client({ ...opts, channels: [] });
 
-  /**
-   * Username of the channel.
-   * @type {string}
-   * @private
-   */
-  #username = null;
+  /** Username of the channel. */
+  #username: string;
 
-  /**
-   *  Bot response queue of the channel.
-   * @type {Queue<import("./response")>}
-   * @private
-   */
-  #responseQueue = new Queue();
+  /** Bot response queue of the channel. */
+  #responseQueue = new Queue<BotResponse>();
 
-  /**
-   * Current message state of a channel.
-   * @type {MessageState}
-   * @private
-   */
-  #messageState = new MessageState();
-
-  /**
-   * Number of resends before automatic dequeue.
-   * @type {number}
-   */
-  #resendLimit = 3;
+  /** Current message state of a channel. */
+  #messageState: MessageState = new MessageState();
 
   /**
    * A unique interval ID which identifies the timer created by the setInterval
    * method invocation.
-   * @type {number}
    */
-  #setIntervalID = null;
+  #setIntervalID: ReturnType<typeof setInterval> | null = null;
+
+  /** Number of resends before automatic dequeue. */
+  #resendLimit = 3;
 
 
   /**
    * Monitor and manage the state of each channel in which the bot resides.
-   * @param {import("../types/client")} client - Bot's instance.
-   * @param {string} username - Username of the channel.
-   * @param {number} [resendLimit=3] -  Number of resends before the response is
-   * dequeued automatically.
+   * @param client Bot's instance.
+   * @param username Username of the channel.
+   * @param resendLimit  Number of resends before the response is dequeued
+   * automatically.
    */
-  constructor(client, username, resendLimit) {
+  constructor(client: Client, username: string, resendLimit?: number) {
     const isChannelExists = Channel.checkChannel(username);
     if (isChannelExists) throw new Error(`'${username}' state already exists.`);
 
@@ -77,13 +56,13 @@ class Channel {
      * The queue is polled every set interval and is activated or deactivated
      * based on the presence of atleast one response in a queue.
      */
-    const beforeEnqueueCallback = function() {
+    const beforeEnqueueCallback = function(this: Channel): void {
       if (this.#responseQueue.isEmpty()) {
         const pollingInterval = 5000;
         this.#setIntervalID = setInterval(
           () => {
             try {
-              responseQueueManager(this, client, this.#resendLimit);
+              responseManager(this, client, this.#resendLimit);
             }
             catch (err) {
               if (!(err instanceof Error)) throw new Error("Unhandled error.");
@@ -93,7 +72,7 @@ class Channel {
               const target = responseState.target;
               const response = responseState.response;
               logger.info(`\n* Could not execute "${request}" command`);
-              logger.info("* Details:", { target, response });
+              logger.info("* Details:", JSON.stringify({ target, response }));
               console.error(err.message);
             }
           },
@@ -103,8 +82,11 @@ class Channel {
     };
     this.#responseQueue.beforeEnqueue(beforeEnqueueCallback.bind(this));
 
-    const afterDequeueCallback = function() {
+    const afterDequeueCallback = function(this: Channel): void {
       if (this.#responseQueue.isEmpty()) {
+        if (!(this.#setIntervalID)) {
+          throw new Error("Private variable #setIntervalID is not set");
+        }
         clearInterval(this.#setIntervalID);
         this.#setIntervalID = null;
       }
@@ -115,16 +97,16 @@ class Channel {
     const onListenHandler = this.#onListenHandler.bind(this);
     this.#listner.on("message", onListenHandler);
 
-    this.#listner.on("connected", (addr, port) => {
+    this.#listner.on("connected", (addr: string, port: number) => {
       logger.info(`* Listner connected on ${username} to ${addr}:${port}`);
     });
-    this.#listner.on("join", (channel) => {
+    this.#listner.on("join", (channel: string) => {
       const nonPrefixedUsername = channel.substring(1);
       if (nonPrefixedUsername !== this.#username)
         throw new Error("Channel should and can have only one unique Listner.");
     });
     if (process.env.NODE_ENV !== "test") {
-      this.#listner.connect().catch(err => console.error(err));
+      this.#listner.connect().catch((err: unknown) => console.error(err));
     }
 
     Channel.#channels[this.#username] = this;
@@ -134,16 +116,14 @@ class Channel {
   /**
    * The username of a channel.
    */
-  get username() { return this.#username; }
+  get username(): string { return this.#username; }
 
 
   /**
    * Get the current instance of a particular channel.
-   * @param {string} username - Username of the channel.
-   * @returns {Channel} - Current instance of a particular channel with the
-   * given username.
+   * @param username Username of the channel given username.
    */
-  static getChannel(username) {
+  static getChannel(username: string): Channel {
     const channel = Channel.#channels[username];
     if (!channel) {
       throw new Error(`The channel '${channel}' has not been initialized.`);
@@ -154,20 +134,16 @@ class Channel {
 
   /**
    * Check if the channel exists on the current instance of the server.
-   * @param {string} username - Username of associated with the channel.
-   * @returns {boolean} Boolean flag indicating the existance of the channel
-   * with the given username.
+   * @param username - Username of associated with the channel.
    */
-  static checkChannel(username) {
+  static checkChannel(username: string): boolean {
     if (Object.keys(Channel.#channels).includes(username)) return true;
     return false;
   }
 
 
-  /**
-   * Clears all channel instances on the server.
-   */
-  static clearChannels() {
+  /** Clears all channel instances on the server. */
+  static clearChannels(): void {
     Channel.#channels = {};
   }
 
@@ -175,9 +151,8 @@ class Channel {
   /**
    * Returns the bot's response queues for a channel.
    * @param channel - Username of the channel.
-   * @returns {Queue<import("./response")>} - Response queue.
    */
-  static getResponseQueue(channel) {
+  static getResponseQueue(channel: string): Queue<BotResponse> {
     const user = Channel.getChannel(channel);
     return user.getResponseQueue();
   }
@@ -185,13 +160,13 @@ class Channel {
 
   /**
    * Monitor bot responses.
-   * @param {string} channel Username of the channel.
-   * @param {import("tmi.js").CommonUserstate} context Meta data of the user who
-   * message picked up by the listner.
-   * @param {string} message Bot message/response picked up by the listener on a
-   * target channel.
+   * @param channel Username of the channel.
+   * @param context Meta data of the user who message picked up by the listner.
+   * @param message Bot message picked up by the listener on a target channel.
    */
-  #onListenHandler(channel, context, message) {
+  #onListenHandler(
+    channel: string, context: ChatUserstate, message: string
+  ): void {
     const listenedUsername = String(context["display-name"]).toLowerCase();
     if (!(listenedUsername === process.env.USERNAME)) return;
 
@@ -209,7 +184,7 @@ class Channel {
     if (message !== response) return;
 
     logger.info(`\n* Executed "${request}" command`);
-    logger.info("* Details:", { target, response });
+    logger.info("* Details:", JSON.stringify({ target, response }));
 
     const messageState = this.getMessageState();
     messageState.nextMessageState(message, Date.now());
@@ -218,11 +193,8 @@ class Channel {
   }
 
 
-  /**
-   * Check if a listner exists on the channel.
-   * @returns {Boolean} The status of the existance of listner in the channel.
-   */
-  checkListner() {
+  /** Check if a listner exists on the channel. */
+  checkListner(): boolean {
     const [channel] = this.#listner.getChannels();
     const username = channel.substring(1);
     if (username === this.#username) return true;
@@ -230,45 +202,28 @@ class Channel {
   }
 
 
-  /**
-   * Get the current message state of the channel.
-   * @returns {MessageState} - Current message state of the channel.
-   */
-  getMessageState() { return this.#messageState; }
+  /** Get the current message state of the channel. */
+  getMessageState(): MessageState { return this.#messageState; }
 
 
-  /**
-   * Returns the bot's response queues for a this channel.
-   * @returns {Queue<import("./response")>} - Response queue.
-   */
-  getResponseQueue() {
+  /** Returns the bot's response queues for a this channel. */
+  getResponseQueue(): Queue<BotResponse> {
     return this.#responseQueue;
   }
 }
 
 
 /**
-   * Hold a bot's latest message state for a particular channel.
-   * @class
-   * @public
-   */
-class MessageState {
-  /**
-     * The latest message sent to the channel by the bot.
-     * @type {string}
-     */
-  #recentMessage = null;
+ * Hold a bot's latest message state for a particular channel.
+ */
+export class MessageState {
+  /** The latest message sent to the channel by the bot. */
+  #recentMessage: string | null = null;
 
-  /**
-   * Epox time of the latest message sent by the bot.
-   * @type {number}
-   */
-  #messageLastSent = null;
+  /** Epox time of the latest message sent by the bot. */
+  #messageLastSent: number | null = null;
 
-  /**
-   * Default message duplication cooldown period.
-   * @type {number}
-   */
+  /** Default message duplication cooldown period. */
   #filterBypassInterval = 30;
 
 
@@ -276,7 +231,7 @@ class MessageState {
    * The latest message sent to the channel by the bot.
    * @readonly
    */
-  get recentMessage() {
+  get recentMessage(): string | null {
     return this.#recentMessage;
   }
 
@@ -284,7 +239,7 @@ class MessageState {
    * Epox time of the latest message sent by the bot.
    * @readonly
    */
-  get messageLastSent() {
+  get messageLastSent(): number | null {
     return this.#messageLastSent;
   }
 
@@ -292,17 +247,17 @@ class MessageState {
    *  Message duplication cooldown period.
    * @readonly
    */
-  get filterBypassInterval() {
+  get filterBypassInterval(): number {
     return this.#filterBypassInterval;
   }
 
 
   /**
    * Change how the next message must be sent on a particular channel.
-   * @param {string} recentMessage - The last message on the channel.
-   * @param {number} messageLastSent - Epox time of the previous message sent.
+   * @param recentMessage - The last message on the channel.
+   * @param messageLastSent - Epox time of the previous message sent.
    */
-  nextMessageState(recentMessage, messageLastSent) {
+  nextMessageState(recentMessage: string, messageLastSent: number): void {
     this.#recentMessage = recentMessage;
     this.#messageLastSent = messageLastSent;
   }
@@ -314,16 +269,15 @@ class MessageState {
    * @description The retrieval and processing of the channel's response queue
    * is done with the help of the setInterval() method where the response queue
    * is polled every set interval, in ms.
-   * @param {import("../types/channel").Channel} channelState - Current state of
-   * a channel.
-   * @param {import("../types/client")} client - Bot's instance.
-   * @param {number} resendLimit -  Number of times a response resent before it
-   * is removed from the queue automatically.
-   * @returns {number} - An interval ID which uniquely identifies the timer
-   * created by the call to setInterval().
+   * @param channel Current state of a channel.
+   * @param client Bot's instance.
+   * @param resendLimit  Number of times a response resent before it is removed
+   * from the queue automatically.
    */
-function responseQueueManager(channelState, client, resendLimit) {
-  const responseQueue = channelState.getResponseQueue();
+function responseManager(
+  channel: Channel, client: Client, resendLimit: number
+): void {
+  const responseQueue = channel.getResponseQueue();
   if (responseQueue.isEmpty()) return;
 
   let responseState = responseQueue.retrieve();
@@ -335,9 +289,9 @@ function responseQueueManager(channelState, client, resendLimit) {
     responseState = responseQueue.retrieve();
   }
 
-  const isListnerExists = channelState.checkListner();
+  const isListnerExists = channel.checkListner();
   if (!isListnerExists) {
-    throw new Error(`Listner not connected to ${channelState.username}`);
+    throw new Error(`Listner not connected to ${channel.username}`);
   }
 
   /**
@@ -345,11 +299,11 @@ function responseQueueManager(channelState, client, resendLimit) {
    * twitch IRC server. Therefore, listner would not be able to pick up any
    * of the bot's response.
    */
-  clientResponse(client, channelState.getMessageState(), responseState);
+  clientResponse(client, channel.getMessageState(), responseState);
   if (!(process.env.NODE_ENV === "live")) {
     responseQueue.dequeue();
   }
 }
 
 
-module.exports = { Channel, MessageState };
+export default Channel;

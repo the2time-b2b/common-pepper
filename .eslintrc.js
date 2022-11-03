@@ -5,11 +5,18 @@ module.exports = {
     "node": true,
     "jest": true
   },
-  "extends": "eslint:recommended",
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "plugins": ["@typescript-eslint"],
+  "parser": "@typescript-eslint/parser",
   "parserOptions": {
-    "ecmaVersion": "latest"
+    "ecmaVersion": "latest",
+    "project": "./tsconfig.json"
   },
   "rules": {
+    "no-unused-vars": "off",
     "block-spacing": "error",
     "consistent-return": "error",
     "camelcase": "error",
@@ -29,12 +36,12 @@ module.exports = {
     "no-var": "error",
     "prefer-const": "error",
     "space-before-blocks": "error",
+    "no-case-declarations": "error",
 
     "eol-last": ["error", "always"],
     "indent": ["error", 2, { "SwitchCase": 1 }],
     "object-curly-spacing": ["error", "always"],
     "quotes": ["error", "double"],
-    "semi": ["error", "always"],
     "space-in-parens": ["error", "never"],
     "space-before-function-paren": ["error", "never"],
     "spaced-comment": ["error", "always"],
@@ -51,5 +58,13 @@ module.exports = {
       "error",
       { "allow": ["warn", "error", "info"] }
     ],
+
+
+    "@typescript-eslint/semi": "error",
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/explicit-function-return-type": "error",
+    "@typescript-eslint/explicit-module-boundary-types": "error",
+    "@typescript-eslint/restrict-plus-operands": "error",
   }
 };

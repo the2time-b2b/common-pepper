@@ -1,7 +1,10 @@
-const tmi = require("tmi.js");
+import { Client, Options } from "tmi.js";
+
+import type { MessageState } from "./channel";
+import type BotResponse from "./response";
 
 
-module.exports = class Client extends tmi.Client {
+export default class ClientExtension extends Client {
   /**
    * Cooldown period between two consecutive bot responses.
    * @type {number}
@@ -10,11 +13,11 @@ module.exports = class Client extends tmi.Client {
 
 
   /**
-   * @param {import("tmi.js").Options} opts
+   * @param opts
    * - Client connection options.
    * - docs: https://tmijs.com/#guide-options
    */
-  constructor(opts) {
+  constructor(opts: Options) {
     super(opts);
 
     const messageInterval = process.env.MESSAGE_INTERVAL;
@@ -36,10 +39,8 @@ module.exports = class Client extends tmi.Client {
 
   /**
    * Send a response to a particular channel.
-   * @param {string} channel - Recipient channel.
-   * @param {import("../types/response")} responseState - Current state of a
-   * Response.
-   * @param {import("../types/channel").MessageState} messageState
+   * @param responseState - Current state of a bot response.
+   * @param  messageState
    * @returns {Promise<[string]>}
    * - Resolves on message sent and returns [channel] on production.
    * - Resolves and returns [channel, message] on test/dev.
@@ -47,7 +48,9 @@ module.exports = class Client extends tmi.Client {
    * of bypassing the message duplication filter and prevents intentional or
    * unintentional global cooldown due to fast chat message invocation rates.
    */
-  say(responseState, messageState) {
+  send(
+    responseState: BotResponse, messageState: MessageState
+  ): Promise<string[]> {
     const nodeEnv = process.env.NODE_ENV || "dev";
     const messageInterval = this.#messageInterval;
     const lastSent = messageState.messageLastSent;
@@ -95,10 +98,10 @@ module.exports = class Client extends tmi.Client {
 
   /**
    * Change the rate at which the message in sent on every channel, in seconds.
-   * @param {number} seconds Number of seconds to wait before sending next
-   * consecutive message.
+   * @param seconds Number of seconds to wait before sending next consecutive
+   * message.
    */
-  changeMessageInterval(seconds) {
+  changeMessageInterval(seconds: number): void {
     this.#messageInterval = seconds;
   }
-};
+}

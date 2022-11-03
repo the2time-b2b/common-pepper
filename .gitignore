@@ -1,14 +1,17 @@
-# Dependency directories
+# Dependency directories.
 node_modules/
 
-# dotenv environment variables file
+# Build directory.
+build/
+
+# dotenv environment variables file.
 .env
 
-# jest test coverage
+# jest test coverage.
 coverage
 
-# vscode configurations
+# vscode configurations.
 .vscode
 
-# local db
+# local db.
 tasks-db*.json
