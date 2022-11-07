@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "help": "Say something at every interval on a particular channel.",
   "usage":
     `${process.env.PREFIX}say <message> every <interval> on <channel> ` +
@@ -14,7 +14,7 @@ module.exports = {
     "on the channel specified.",
   "interval":
     "Interval should be in h:m:s or m:s or s format and not be " +
-    "unrealistically large.",
+    "unrealistically large or small.",
   "channel":
     "Channel in which the bot says the specified message every set " +
     "interval. Channel's username should contain 4-25 characters which " +

@@ -5,6 +5,8 @@
   "main": "common-pepper.ts",
   "scripts": {
     "tsc": "tsc",
+    "ts-node": "ts-node",
+    "ts-node-dev": "ts-node-dev",
     "start": "cross-env NODE_ENV=live node build/common-pepper.js",
     "dev:prod": "cross-env NODE_ENV=live ts-node-dev common-pepper.ts",
     "dev": "cross-env NODE_ENV=dev ts-node-dev common-pepper.ts",
