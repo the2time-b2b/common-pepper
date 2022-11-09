@@ -1,10 +1,14 @@
-const { ToadScheduler, SimpleIntervalJob, Task } = require("toad-scheduler");
-const Response = require("./../../../types/response");
-const { Channel } = require("./../../../types/channel");
-const Client = require("./../../../types/client");
+import { ToadScheduler, SimpleIntervalJob, Task } from "toad-scheduler";
+import Response from "./../../../types/response";
+import Channel from "./../../../types/channel";
+import Client from "./../../../types/client";
 
-const { opts } = require("./../../../config");
-const logger = require("./../../../utils/logger");
+import { DBTask } from "./tasks";
+
+import { TaskAttributes } from "./types";
+
+import { opts } from "./../../../config";
+import * as logger from "./../../../utils/logger";
 
 
 class Scheduler {
@@ -14,10 +18,9 @@ class Scheduler {
 
   /**
    * Initialize any saved tasks from the local JSON database.
-   * @param {import("./typedefs").DBTasks} tasks Tasks from the local JSON
-   * database that is to be initialized.
+   * @param tasks Tasks from the local JSON database that is to be initialized.
    */
-  static init(tasks) {
+  static init(tasks: ParsedTasks): void {
     if (process.env.NODE_ENV === "test") return;
 
     this.#client.on("connected", function(addr, port) {
@@ -37,15 +40,15 @@ class Scheduler {
   /**
    * Add a task to the scheduler that needs to be activated in channel specified
    * by the task object.
-   * @param {import("./typedefs").DBTask} task The task to be added.
-   * @param {string} name Unique name for the task.
+   * @param task The task to be added.
+   * @param name Unique name for the task.
    */
-  static addTask(task, name) {
+  static addTask(task: ParsedTask, name: string): void {
     if (process.env.NODE_ENV === "test") return;
 
-    const username = task.channel;
-    const interval = task.totalWaitInterval;
-    const message = task.taskMessage;
+    const username = task[TaskAttributes["Channel"]];
+    const interval = task[TaskAttributes["Interval"]];
+    const message = task[TaskAttributes["Message"]];
 
     let user;
     const isUserStateTracked = Channel.checkChannel(username);
@@ -83,9 +86,9 @@ class Scheduler {
 
   /**
    * Removes the task for the scheduler.
-   * @param {string} name The unique name of the task to be removed.
+   * @param name The unique name of the task to be removed.
    */
-  static removeTask(name) {
+  static removeTask(name: string): void {
     if (process.env.NODE_ENV === "test") return;
 
     Scheduler.#scheduler.removeById(name);
@@ -93,4 +96,11 @@ class Scheduler {
 }
 
 
-module.exports = Scheduler;
+export type ParsedTask = { [TaskAttributes.Interval]: number }
+  & Omit<DBTask, TaskAttributes.Interval>;
+
+
+export type ParsedTasks = Record<string, ParsedTask>;
+
+
+export default Scheduler;

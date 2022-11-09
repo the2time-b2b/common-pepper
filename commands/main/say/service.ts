@@ -78,7 +78,7 @@ export function checkTaskName(taskName: string): boolean {
 export function parseInterval(interval: RawInterval): ParsedInterval {
   const timeParts = interval.split(":");
 
-  if (timeParts.length > 0 || timeParts.length < 4)
+  if (timeParts.length < 1 || timeParts.length > 3)
     throw new Error("Time parts of an interval cannot be more than 3.");
 
 

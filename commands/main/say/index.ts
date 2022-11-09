@@ -1,7 +1,6 @@
 import { Say, TaskAttributes } from "./types";
 import * as service from "./service";
-const Task = require("./task");
-const Tasks = require("./tasks");
+import { default as Tasks, Task } from "./tasks";
 
 import description from "./description";
 
@@ -52,7 +51,12 @@ const say: Say = {
     const [seconds, minutes, hours] = parsedInterval;
     const intervalInSeconds = service.convertToSeconds(seconds, minutes, hours);
 
-    const newTask = new Task(taskName, intervalInSeconds, channel, message);
+    const newTask: Task = {
+      [TaskAttributes.Interval]: intervalInSeconds.toString(),
+      [TaskAttributes.TaskName]: taskName,
+      [TaskAttributes.Channel]: channel,
+      [TaskAttributes.Message]: message
+    };
 
     return Tasks.createTask(newTask);
   },
@@ -73,8 +77,12 @@ const say: Say = {
 
     const modifiedValue = request.join(" ").toLowerCase();
 
+    const modifiedTask: Partial<Task> = {};
+
     if (attribute === TaskAttributes.Message) {
       if (request.length === 0) return description.message;
+
+      modifiedTask[TaskAttributes.Message] = modifiedValue;
     }
 
     let intervalInSeconds: number | null = null;
@@ -87,26 +95,25 @@ const say: Say = {
 
       const [seconds, minutes, hours] = parsedInterval;
       intervalInSeconds = service.convertToSeconds(seconds, minutes, hours);
+
+      modifiedTask[TaskAttributes.Interval] = intervalInSeconds.toString();
     }
 
     if (attribute === TaskAttributes.Channel) {
       if (!service.checkChannelName(modifiedValue))
         return description.channel;
+
+      modifiedTask[TaskAttributes.Channel] = modifiedValue;
     }
 
     if (attribute === TaskAttributes.TaskName) {
       if (!service.checkTaskName(modifiedValue))
         return description["task-name"];
+
+      modifiedTask[TaskAttributes.TaskName] = modifiedValue;
     }
 
-    const newTask = new Task(
-      (attribute === TaskAttributes.TaskName) ? modifiedValue : null,
-      (attribute === TaskAttributes.Interval) ? intervalInSeconds : null,
-      (attribute === TaskAttributes.Channel) ? modifiedValue : null,
-      (attribute === TaskAttributes.Message) ? modifiedValue : null
-    );
-
-    return Tasks.updateTask(taskName, newTask);
+    return Tasks.updateTask(taskName, modifiedTask);
   }
 };
 

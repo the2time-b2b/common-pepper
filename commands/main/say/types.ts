@@ -19,6 +19,7 @@ export enum TaskAttributes {
 }
 
 
+/** Ordered attribute structure used to create a task. */
 export type CreateTaskStructure = [
   intervalAttribute: TaskAttributes.Interval,
   interval: string,
@@ -33,6 +34,10 @@ type RawSeconds = `${number}`;
 type RawMinutes = `${number}:${number}`;
 type RawHours = `${number}:${number}:${number}`;
 
+/**
+ * String literal of `:` seperated number supplied by the user respresenting an
+ * interval.
+ */
 export type RawInterval = RawSeconds | RawMinutes | RawHours;
 
 
