@@ -1,4 +1,4 @@
-import { Say, TaskAttributes } from "./types";
+import { Say, CommandAttributes } from "./types";
 import * as service from "./service";
 import { default as Tasks, Task } from "./tasks";
 
@@ -13,13 +13,14 @@ const say: Say = {
       Tasks.clearTasks();
       return "The task list has been wiped clean.";
     }
+
     if (request[0] === "modify") {
       const modifiedAttributes = request.splice(1);
       return this.modifyTask(modifiedAttributes);
     }
 
     // Ideally, each task attribute itself has an adjacent value.
-    const TaskAttributesLength = Object.values(TaskAttributes).length * 2;
+    const TaskAttributesLength = Object.values(CommandAttributes).length * 2;
 
     // Task message argument does not have a key in a create task request.
     if (request.length < TaskAttributesLength - 1) return description.usage;
@@ -52,10 +53,10 @@ const say: Say = {
     const intervalInSeconds = service.convertToSeconds(seconds, minutes, hours);
 
     const newTask: Task = {
-      [TaskAttributes.Interval]: intervalInSeconds.toString(),
-      [TaskAttributes.TaskName]: taskName,
-      [TaskAttributes.Channel]: channel,
-      [TaskAttributes.Message]: message
+      "taskName": taskName,
+      "interval": intervalInSeconds.toString(),
+      "channel": channel,
+      "message": message
     };
 
     return Tasks.createTask(newTask);
@@ -79,14 +80,14 @@ const say: Say = {
 
     const modifiedTask: Partial<Task> = {};
 
-    if (attribute === TaskAttributes.Message) {
+    if (attribute === CommandAttributes.message) {
       if (request.length === 0) return description.message;
 
-      modifiedTask[TaskAttributes.Message] = modifiedValue;
+      modifiedTask.message = modifiedValue;
     }
 
     let intervalInSeconds: number | null = null;
-    if (attribute === TaskAttributes.Interval) {
+    if (attribute === CommandAttributes.interval) {
       if (!service.checkInterval(modifiedValue)) return description.interval;
 
       const parsedInterval = service.parseInterval(modifiedValue);
@@ -96,21 +97,21 @@ const say: Say = {
       const [seconds, minutes, hours] = parsedInterval;
       intervalInSeconds = service.convertToSeconds(seconds, minutes, hours);
 
-      modifiedTask[TaskAttributes.Interval] = intervalInSeconds.toString();
+      modifiedTask.interval = intervalInSeconds.toString();
     }
 
-    if (attribute === TaskAttributes.Channel) {
+    if (attribute === CommandAttributes.channel) {
       if (!service.checkChannelName(modifiedValue))
         return description.channel;
 
-      modifiedTask[TaskAttributes.Channel] = modifiedValue;
+      modifiedTask.channel = modifiedValue;
     }
 
-    if (attribute === TaskAttributes.TaskName) {
+    if (attribute === CommandAttributes.taskName) {
       if (!service.checkTaskName(modifiedValue))
         return description["task-name"];
 
-      modifiedTask[TaskAttributes.TaskName] = modifiedValue;
+      modifiedTask.taskName = modifiedValue;
     }
 
     return Tasks.updateTask(taskName, modifiedTask);

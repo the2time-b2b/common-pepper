@@ -11,21 +11,40 @@ export interface Say extends Command {
 }
 
 
-export enum TaskAttributes {
-  Message = "say",
-  Interval = "every",
-  Channel = "on",
-  TaskName = "named",
-}
+export const CommandAttributes = {
+  message: "say",
+  interval: "every",
+  channel: "on",
+  taskName: "named",
+} as const;
 
+
+export type CommandAttribute = keyof typeof CommandAttributes;
+export type CommandAttributeValue = typeof CommandAttributes[CommandAttribute];
+
+
+export type TaskAttribute = Exclude<CommandAttribute, "taskName">;
+
+
+const MessageTaskAttribute = { message: CommandAttributes.message } as const;
+type MessageAttribute = keyof typeof MessageTaskAttribute;
+type MessageAttributeValue = typeof MessageTaskAttribute[MessageAttribute];
+
+const ChannelTaskAttribute = { channel: CommandAttributes.channel } as const;
+type ChannelAttribute = keyof typeof ChannelTaskAttribute;
+type ChannelAttributeValue = typeof ChannelTaskAttribute[ChannelAttribute];
+
+const TaskNameTaskAttribute = { taskName: CommandAttributes.taskName } as const;
+type TaskNameAttribute = keyof typeof TaskNameTaskAttribute;
+type TaskNameAttributeValue = typeof TaskNameTaskAttribute[TaskNameAttribute];
 
 /** Ordered attribute structure used to create a task. */
 export type CreateTaskStructure = [
-  intervalAttribute: TaskAttributes.Interval,
+  intervalAttribute: Extract<MessageAttributeValue, CommandAttributeValue>,
   interval: string,
-  channelAttribute: TaskAttributes.Channel,
+  channelAttribute: Extract<ChannelAttributeValue, CommandAttributeValue>,
   channel: string,
-  taskNameAttribute: TaskAttributes.TaskName,
+  taskNameAttribute: Extract<TaskNameAttributeValue, CommandAttributeValue>,
   taskName: string,
 ];
 

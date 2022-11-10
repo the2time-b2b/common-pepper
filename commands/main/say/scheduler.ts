@@ -5,8 +5,6 @@ import Client from "./../../../types/client";
 
 import { DBTask } from "./tasks";
 
-import { TaskAttributes } from "./types";
-
 import { opts } from "./../../../config";
 import * as logger from "./../../../utils/logger";
 
@@ -46,9 +44,9 @@ class Scheduler {
   static addTask(task: ParsedTask, name: string): void {
     if (process.env.NODE_ENV === "test") return;
 
-    const username = task[TaskAttributes["Channel"]];
-    const interval = task[TaskAttributes["Interval"]];
-    const message = task[TaskAttributes["Message"]];
+    const username = task.channel;
+    const interval = task.interval;
+    const message = task.message;
 
     let user;
     const isUserStateTracked = Channel.checkChannel(username);
@@ -96,8 +94,7 @@ class Scheduler {
 }
 
 
-export type ParsedTask = { [TaskAttributes.Interval]: number }
-  & Omit<DBTask, TaskAttributes.Interval>;
+export type ParsedTask = { "interval": number } & Omit<DBTask, "interval">;
 
 
 export type ParsedTasks = Record<string, ParsedTask>;

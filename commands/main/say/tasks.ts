@@ -2,7 +2,7 @@ import fs from "fs";
 import { default as Scheduler, ParsedTask, ParsedTasks } from "./scheduler";
 
 import path from "path";
-import { TaskAttributes } from "./types";
+import { CommandAttributes, TaskAttribute } from "./types";
 
 import * as logger from "../../../utils/logger";
 
@@ -18,9 +18,7 @@ class Tasks {
   );
 
 
-  static get databasePath(): string {
-    return this.#databasePath;
-  }
+  static get databasePath(): string { return this.#databasePath; }
 
 
   /** Creates a new local database. */
@@ -67,7 +65,7 @@ class Tasks {
         const task = taskList[i];
         const parsedTask = {
           ...task,
-          [TaskAttributes.Interval]: Number(task[TaskAttributes.Interval])
+          "interval": Number(task.interval)
         };
         parsedTasks[`${taskNames[i]}`] = parsedTask;
       }
@@ -94,9 +92,9 @@ class Tasks {
       const properJSONStructure = `
       A valid JSON structure should be of the format:
       \n[\n\t{\n\t\t"<task name>": {
-      \n\t\t\t"${TaskAttributes.Interval}": <total_time_in_seconds>,
-      \n\t\t\t"${TaskAttributes.Channel}": "<channel_name>",
-      \n\t\t\t"${TaskAttributes.Message}": "<message>"
+      \n\t\t\t"${CommandAttributes.interval}": <total_time_in_seconds>,
+      \n\t\t\t"${CommandAttributes.channel}": "<channel_name>",
+      \n\t\t\t"${CommandAttributes.message}": "<message>"
       \n\t\t}\n\t\t"<another task name>": {\n\t\t\t...\n\t\t}...\n\t}\n]`;
       logger.info(properJSONStructure);
 
@@ -119,21 +117,20 @@ class Tasks {
    */
   static createTask(task: Task): string {
     const tasks = Tasks.retrieveTasks();
-    if (tasks[task[TaskAttributes.TaskName]])
-      return `Task '${task[TaskAttributes.TaskName]}' already exists.`;
+    if (tasks[task.taskName])
+      return `Task '${task.taskName}' already exists.`;
 
     const validTask = getDBTask(task);
 
-    tasks[task[TaskAttributes.TaskName]] = validTask;
+    tasks[task.taskName] = validTask;
     Tasks.#storeTask([tasks]);
 
     const parsedTask: ParsedTask = {
-      ...task, [TaskAttributes.Interval]: Number(TaskAttributes.Interval)
+      ...task, "interval": Number(task.interval)
     };
-    Scheduler.addTask(parsedTask, task[TaskAttributes.TaskName]);
+    Scheduler.addTask(parsedTask, task.taskName);
 
-    return "Task " + task[TaskAttributes.TaskName] + " activated on channel "
-      + task[TaskAttributes.Channel] + ".";
+    return `Task ${task.taskName} activated on channel ${task.channel}.`;
   }
 
 
@@ -157,21 +154,15 @@ class Tasks {
     const oldTask = tasks[taskName];
 
     const toModify: Partial<DBTask> = {};
-    if (task[TaskAttributes.Interval]) {
-      toModify[TaskAttributes.Interval] = task[TaskAttributes.Interval];
-    }
-    if (task[TaskAttributes.Channel]) {
-      toModify[TaskAttributes.Channel] = task[TaskAttributes.Channel];
-    }
-    if (task[TaskAttributes.Message]) {
-      toModify[TaskAttributes.Message] = task[TaskAttributes.Message];
-    }
+    if (task.interval) toModify.interval = task.interval;
+    if (task.channel) toModify.channel = task.channel;
+    if (task.message) toModify.message = task.message;
 
     const modifiedTask = { ...oldTask, ...toModify };
 
-    if (typeof task[TaskAttributes.TaskName] === "undefined") throw new Error();
+    if (typeof task.taskName === "undefined") throw new Error();
 
-    let modifiedTaskName = task[TaskAttributes.TaskName];
+    let modifiedTaskName = task.taskName;
     if (!modifiedTaskName) {
       modifiedTaskName = taskName;
     }
@@ -183,8 +174,7 @@ class Tasks {
     Tasks.#storeTask([tasks]);
 
     const parsedTask: ParsedTask = {
-      ...modifiedTask,
-      [TaskAttributes.Interval]: Number(modifiedTask[TaskAttributes.Interval])
+      ...modifiedTask, "interval": Number(modifiedTask.interval)
     };
     Scheduler.addTask(parsedTask, modifiedTaskName);
 
@@ -231,10 +221,9 @@ class Tasks {
    *     }
    * ]
   * ```
-   * @param {import("./typedefs").DBSchema} db
+   * @param db
    * - Parsed JSON file.
    * - Set the value to be an empty string - `""`, if it's not to be validated.
-   * @param {string} taskName Name of the task for task specific validation.
    */
   static validateJSON(db: unknown): db is DBSchema {
     if (!Array.isArray(db)) return false;
@@ -247,25 +236,18 @@ class Tasks {
         if (task === null) return false;
         if (typeof task !== "object") return false;
         const attributes = Object.keys(task);
-        const validAttributes = {
-          interval: TaskAttributes.Interval,
-          channel: TaskAttributes.Channel,
-          message: TaskAttributes.Message,
-        };
+        const validTaskAttributes: Array<TaskAttribute> = [
+          "channel", "interval", "message"
+        ];
+        const validStringTaskAttributes: Array<string> = validTaskAttributes;
 
-        const validStringAttributes = Object.values(validAttributes)
-          .map(validAttribute => {
-            if (typeof validAttribute !== "string")
-              throw new ReferenceError("attribute should be a string");
-
-            return validAttribute.toString();
-          });
-
-        if (attributes.length !== validStringAttributes.length) return false;
+        if (attributes.length !== validTaskAttributes.length) return false;
         for (let i = 0; i < attributes.length; i++) {
           const attribute = attributes[i];
 
-          const isValidAttribute = validStringAttributes.includes(attribute);
+          const isValidAttribute = validStringTaskAttributes
+            .includes(attribute);
+
           if (!isValidAttribute) return false;
         }
       }
@@ -284,18 +266,18 @@ Tasks.init();
  */
 function getDBTask(task: Task): DBTask {
   return {
-    [TaskAttributes.Channel]: task[TaskAttributes.Channel],
-    [TaskAttributes.Interval]: task[TaskAttributes.Interval],
-    [TaskAttributes.Message]: task[TaskAttributes.Message]
+    "channel": task.channel,
+    "interval": task.interval,
+    "message": task.message,
   };
 }
 
 
-export type Task = Record<TaskAttributes, string>;
+export type Task = Record<keyof typeof CommandAttributes, string>;
 
 
 /** Schema of a task in the local JSON database. */
-export type DBTask = Omit<Task, TaskAttributes.TaskName>;
+export type DBTask = Omit<Task, "taskName">;
 
 
 /** Schema of the list of tasks in the local JSON database. */

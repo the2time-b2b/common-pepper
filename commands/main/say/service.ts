@@ -1,5 +1,9 @@
 import {
-  CreateTaskStructure, TaskAttributes, RawInterval, ParsedInterval
+  CreateTaskStructure,
+  CommandAttributes,
+  CommandAttributeValue,
+  RawInterval,
+  ParsedInterval
 } from "./types";
 
 
@@ -12,9 +16,9 @@ import {
 export function checkAttributeStructure(
   attributes: Array<string>
 ): attributes is CreateTaskStructure {
-  if (attributes[0] !== TaskAttributes.Interval) return false;
-  if (attributes[2] !== TaskAttributes.Channel) return false;
-  if (attributes[4] !== TaskAttributes.TaskName) return false;
+  if (attributes[0] !== CommandAttributes.interval) return false;
+  if (attributes[2] !== CommandAttributes.channel) return false;
+  if (attributes[4] !== CommandAttributes.taskName) return false;
 
   return true;
 }
@@ -26,8 +30,8 @@ export function checkAttributeStructure(
  */
 export function validateModifyAttribute(
   attribute: string
-): attribute is TaskAttributes {
-  if (Object.keys(TaskAttributes).includes(attribute)) return true;
+): attribute is CommandAttributeValue {
+  if (Object.keys(CommandAttributes).includes(attribute)) return true;
 
   return false;
 }
