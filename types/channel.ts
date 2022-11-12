@@ -5,7 +5,6 @@ import type { ChatUserstate } from "tmi.js";
 import type BotResponse from "./response";
 
 import * as logger from "../utils/logger";
-import clientResponse from "../lib/response";
 import { opts } from "../config/index";
 
 
@@ -24,8 +23,14 @@ class Channel {
   /** Bot response queue of the channel. */
   #responseQueue = new Queue<BotResponse>();
 
+  /** Message duplication cooldown period. */
+  #bypassInterval = 30;
+
   /** Current message state of a channel. */
-  #messageState: MessageState = new MessageState();
+  #messageState: MessageState = {
+    recentMessage: null,
+    messageLastSent: null
+  };
 
   /**
    * A unique interval ID which identifies the timer created by the setInterval
@@ -62,7 +67,9 @@ class Channel {
         this.#setIntervalID = setInterval(
           () => {
             try {
-              responseManager(this, client, this.#resendLimit);
+              responseManager(
+                this, client, this.#bypassInterval, this.#resendLimit
+              );
             }
             catch (err) {
               if (!(err instanceof Error)) throw new Error("Unhandled error.");
@@ -113,9 +120,7 @@ class Channel {
   }
 
 
-  /**
-   * The username of a channel.
-   */
+  /** The username of a channel. */
   get username(): string { return this.#username; }
 
 
@@ -186,8 +191,7 @@ class Channel {
     logger.info(`\n* Executed "${request}" command`);
     logger.info("* Details:", JSON.stringify({ target, response }));
 
-    const messageState = this.getMessageState();
-    messageState.nextMessageState(message, Date.now());
+    this.nextMessageState(message, Date.now());
 
     this.#responseQueue.dequeue();
   }
@@ -206,60 +210,22 @@ class Channel {
   getMessageState(): MessageState { return this.#messageState; }
 
 
-  /** Returns the bot's response queues for a this channel. */
-  getResponseQueue(): Queue<BotResponse> {
-    return this.#responseQueue;
-  }
-}
-
-
-/**
- * Hold a bot's latest message state for a particular channel.
- */
-export class MessageState {
-  /** The latest message sent to the channel by the bot. */
-  #recentMessage: string | null = null;
-
-  /** Epox time of the latest message sent by the bot. */
-  #messageLastSent: number | null = null;
-
-  /** Default message duplication cooldown period. */
-  #filterBypassInterval = 30;
-
-
-  /**
-   * The latest message sent to the channel by the bot.
-   * @readonly
-   */
-  get recentMessage(): string | null {
-    return this.#recentMessage;
-  }
-
-  /**
-   * Epox time of the latest message sent by the bot.
-   * @readonly
-   */
-  get messageLastSent(): number | null {
-    return this.#messageLastSent;
-  }
-
-  /**
-   *  Message duplication cooldown period.
-   * @readonly
-   */
-  get filterBypassInterval(): number {
-    return this.#filterBypassInterval;
-  }
-
-
   /**
    * Change how the next message must be sent on a particular channel.
    * @param recentMessage - The last message on the channel.
    * @param messageLastSent - Epox time of the previous message sent.
    */
   nextMessageState(recentMessage: string, messageLastSent: number): void {
-    this.#recentMessage = recentMessage;
-    this.#messageLastSent = messageLastSent;
+    const messageState = this.getMessageState();
+
+    messageState.recentMessage = recentMessage;
+    messageState.messageLastSent = messageLastSent;
+  }
+
+
+  /** Returns the bot's response queues for a this channel. */
+  getResponseQueue(): Queue<BotResponse> {
+    return this.#responseQueue;
   }
 }
 
@@ -271,11 +237,12 @@ export class MessageState {
    * is polled every set interval, in ms.
    * @param channel Current state of a channel.
    * @param client Bot's instance.
+   * @param bypassInterval  Message duplication cooldown period.
    * @param resendLimit  Number of times a response resent before it is removed
    * from the queue automatically.
    */
 function responseManager(
-  channel: Channel, client: Client, resendLimit: number
+  channel: Channel, client: Client, bypassInterval: number, resendLimit: number
 ): void {
   const responseQueue = channel.getResponseQueue();
   if (responseQueue.isEmpty()) return;
@@ -299,11 +266,40 @@ function responseManager(
    * twitch IRC server. Therefore, listner would not be able to pick up any
    * of the bot's response.
    */
-  clientResponse(client, channel.getMessageState(), responseState);
-  if (!(process.env.NODE_ENV === "live")) {
-    responseQueue.dequeue();
-  }
+  const messageState = channel.getMessageState();
+
+  client.send(responseState, messageState, bypassInterval)
+    .then(responseStatus => {
+      if (process.env.NODE_ENV !== "live") {
+        logger.info();
+        if (responseState.request) {
+          logger.info(`* Executed "${responseState.request}" command`);
+        }
+
+        logger.info("* Details:", JSON.stringify(
+          { target: responseStatus[0], response: responseStatus[1] }
+        ));
+
+        messageState.recentMessage = responseState.response;
+        messageState.messageLastSent = Date.now();
+
+        responseQueue.dequeue();
+      }
+    })
+    .catch(err => {
+      if (!(err instanceof Error)) throw err;
+      if (err.name !== "sendIntervalError") console.error(err);
+    });
 }
+
+
+/** Hold a bot's latest message state for a particular channel. */
+export type MessageState = {
+  /** The latest message sent to the channel by the bot. */
+  recentMessage: string | null,
+  /** Epox time of the latest message sent by the bot. */
+  messageLastSent: number | null
+};
 
 
 export default Channel;

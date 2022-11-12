@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import * as Channel from "./types/channel";
+import Channel from "./types/channel";
 import Client from "./types/client";
 import BotResponse from "./types/response";
 
@@ -10,7 +10,6 @@ import type { ChatUserstate } from "tmi.js";
 import * as logger from "./utils/logger";
 import executeCommand from "./commands";
 import { opts } from "./config/";
-import clientResponse from "./lib/response";
 
 
 // Create a client with our options
@@ -21,8 +20,8 @@ const client = new Client(opts);
 if (!(opts.channels)) throw new Error("Channels are not specified.");
 opts.channels.forEach((channel: string) => {
   const nonPrefixedUsername = channel.substring(1);
-  const isChannelTracked = Channel.default.checkChannel(nonPrefixedUsername);
-  if (!isChannelTracked) new Channel.default(client, nonPrefixedUsername);
+  const isChannelTracked = Channel.checkChannel(nonPrefixedUsername);
+  if (!isChannelTracked) new Channel(client, nonPrefixedUsername);
 });
 
 
@@ -30,13 +29,13 @@ client.on("message", function(
   channel: string, context: ChatUserstate, message: string, self: boolean
 ) {
   const nonPrefixedUsername = channel.substring(1);
-  const isUserStateTracked = Channel.default.checkChannel(nonPrefixedUsername);
+  const isUserStateTracked = Channel.checkChannel(nonPrefixedUsername);
   if (!isUserStateTracked) {
     throw new Error(`Channel state doesn't exist for ${nonPrefixedUsername}.`);
   }
 
   try {
-    onMessageHandler(client, channel, context, message, self);
+    onMessageHandler(channel, context, message, self);
   }
   catch (err: unknown) {
     logger.info("* Command could not be executed: " + message);
@@ -50,7 +49,6 @@ client.on("message", function(
  * Handle user requests.
  * @description Leading and trailing whitespaces are already pre-trimmed by the
  * incoming requests.
- * @param client Bot's instance.
  * @param target A '#' prefiex username of the channel where the command/message
  * originated from.
  * @param context The chat state of the user who sent the command/message.
@@ -59,7 +57,6 @@ client.on("message", function(
  * current bot's instance.
  */
 function onMessageHandler(
-  client: Client,
   target: string,
   context: ChatUserstate,
   request: string,
@@ -106,18 +103,7 @@ function onMessageHandler(
   const botResponse = executeCommand(context, splitModifiedRequest);
   const responseState = new BotResponse(modifiedRequest, channel, botResponse);
 
-  /*
-    Note: Introduction of response queues breaks current message handler
-    test as 'say' member function is called seperately every set interval.
-  */
-  // TODO: Alter test to reflect the changes due to response queues.
-  if (process.env.NODE_ENV === "test") {
-    const messageState = new Channel.MessageState();
-    clientResponse(client, messageState, responseState);
-    return;
-  }
-
-  const responseQueue = Channel.default.getResponseQueue(channel);
+  const responseQueue = Channel.getResponseQueue(channel);
   responseQueue.enqueue(responseState);
 }
 

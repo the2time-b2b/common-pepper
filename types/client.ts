@@ -39,8 +39,9 @@ export default class ClientExtension extends Client {
 
   /**
    * Send a response to a particular channel.
-   * @param responseState - Current state of a bot response.
-   * @param  messageState
+   * @param responseState Current state of a bot response.
+   * @param messageState Current state of the message of the target channel.
+   * @param bypassInterval Message duplication cooldown period.
    * @returns {Promise<[string]>}
    * - Resolves on message sent and returns [channel] on production.
    * - Resolves and returns [channel, message] on test/dev.
@@ -49,12 +50,13 @@ export default class ClientExtension extends Client {
    * unintentional global cooldown due to fast chat message invocation rates.
    */
   send(
-    responseState: BotResponse, messageState: MessageState
+    responseState: BotResponse,
+    messageState: MessageState,
+    bypassInterval: number
   ): Promise<string[]> {
     const nodeEnv = process.env.NODE_ENV || "dev";
     const messageInterval = this.#messageInterval;
     const lastSent = messageState.messageLastSent;
-    const bypassInterval = messageState.filterBypassInterval;
 
 
     /*
