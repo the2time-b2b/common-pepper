@@ -21,19 +21,15 @@ export default class ClientExtension extends Client {
     super(opts);
 
     const messageInterval = process.env.MESSAGE_INTERVAL;
-    if (!messageInterval) {
-      const error = new Error();
-      error.message = "Environment variable 'MESSAGE_INTERVAL' is not defined";
-      throw error;
+    if (messageInterval) {
+      const parsedMessageInterval = parseInt(messageInterval);
+      if (isNaN(parsedMessageInterval)) {
+        const error = new Error();
+        error.message = "Environment variable 'MESSAGE_INTERVAL' not a number";
+        throw error;
+      }
+      this.#messageInterval = parsedMessageInterval;
     }
-
-    const parsedMessageInterval = parseInt(messageInterval);
-    if (isNaN(parsedMessageInterval)) {
-      const error = new Error();
-      error.message = "Environment variable 'MESSAGE_INTERVAL' is not a number";
-      throw error;
-    }
-    this.#messageInterval = parsedMessageInterval;
   }
 
 

@@ -89,7 +89,8 @@ class Scheduler {
   static removeTask(name: string): void {
     if (process.env.NODE_ENV === "test") return;
 
-    Scheduler.#scheduler.removeById(name);
+    const status = Scheduler.#scheduler.removeById(name);
+    if (!status) throw new Error(`Non-existant task ${name} cannot be removed`);
   }
 }
 

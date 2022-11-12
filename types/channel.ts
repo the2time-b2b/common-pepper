@@ -50,6 +50,13 @@ class Channel {
    * automatically.
    */
   constructor(client: Client, username: string, resendLimit?: number) {
+    const isValidUsername = username.match(/^[a-zA-Z0-9_]{4,25}$/);
+    if (!isValidUsername) throw new Error(
+      "Invalid username: '" + username + "'. " +
+      "Channel's username should contain 4-25 characters which includes " +
+      "alphanumerics and underscores only."
+    );
+
     const isChannelExists = Channel.checkChannel(username);
     if (isChannelExists) throw new Error(`'${username}' state already exists.`);
 
@@ -110,10 +117,13 @@ class Channel {
     this.#listner.on("join", (channel: string) => {
       const nonPrefixedUsername = channel.substring(1);
       if (nonPrefixedUsername !== this.#username)
-        throw new Error("Channel should and can have only one unique Listner.");
+        throw new Error("Channel should and can have only one unique listner.");
     });
     if (process.env.NODE_ENV !== "test") {
-      this.#listner.connect().catch((err: unknown) => console.error(err));
+      this.#listner.connect().catch((err: unknown) => {
+        console.error("Listener cannot join channel: " + this.#username);
+        console.error(err);
+      });
     }
 
     Channel.#channels[this.#username] = this;

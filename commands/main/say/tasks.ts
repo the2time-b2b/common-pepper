@@ -196,13 +196,23 @@ class Tasks {
     delete tasks[taskName];
 
     Tasks.#storeTask([tasks]);
+
+    Scheduler.removeTask(taskName);
+
     return `Task ${taskName} successfully removed.`;
   }
 
 
   /** Clears the task list. */
   static clearTasks(): void {
+    const tasks = Tasks.retrieveTasks();
+    const taskNames = Object.keys(tasks);
+
     Tasks.#checkJSONDatabase(); Tasks.#storeTask([{}]);
+
+    taskNames.forEach(taskName => {
+      Scheduler.removeTask(taskName);
+    });
   }
 
 
