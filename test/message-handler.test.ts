@@ -7,94 +7,163 @@ import * as executeCommand from "../commands";
 
 import entities from "./context";
 
-const dummyClient = new Client({});
-const testChannel = new Channel(dummyClient, "test_target");
-const responseQueue = testChannel.getResponseQueue();
+
+describe("message handler", () => {
+  const testPrefix = "!";
+  const dummyClient = new Client({});
+  const testChannel = new Channel(dummyClient, "test_target");
+  const responseQueue = testChannel.getResponseQueue();
+
+  const target = "#test_target";
+  const testResponse = "test response";
+
+  const executeCommandSpy = jest.spyOn(executeCommand, "default");
+  executeCommandSpy.mockImplementation(() => { return testResponse; });
 
 
-describe("Message handler should", () => {
-  describe("be able to ", () => {
-    const executeCommandSpy = jest.spyOn(executeCommand, "default");
+  beforeEach(() => {
+    process.env.PREFIX = testPrefix;
+    process.env.USERNAME = entities.user.context["display-name"]?.toLowerCase();
+  });
 
-    it("respond if a prefixed messages is received", () => {
+
+  describe("for a valid command with a response", () => {
+    it("should log raw requests", () => {
       const { context, self } = entities.user;
-      const target = "#test_target";
-      const msg = `${process.env.PREFIX}ping`;
-      const response = "R) 7";
+      const request = `${testPrefix}command`;
 
-      onMessageHandler(target, context, msg, self);
+      const loggerSpy = jest.spyOn(console, "info");
+      loggerSpy.mockClear();
+
+      onMessageHandler(target, context, request, self);
+      expect(loggerSpy.mock.calls[0][0])
+        .toBe(`\n* Raw request "${request}" Received`);
+    });
+
+    it("should get the intended response", () => {
+      const { context, self } = entities.user;
+      const request = `${testPrefix}command`;
+
+      onMessageHandler(target, context, request, self);
       expect(executeCommandSpy.mock.calls.length).toBe(1);
-      expect(executeCommandSpy.mock.results[0].value).toBe(response);
-      responseQueue.dequeue();
+      expect(executeCommandSpy.mock.results[0].value).toBe(testResponse);
     });
 
-
-    it("ignores messages with no prefix", () => {
-      const { context, self } = entities.user;
-      const target = "#test_target";
-      const msg = "ping";
-
-      onMessageHandler(target, context, msg, self);
-      expect(executeCommandSpy.mock.calls.length).toBe(0);
-    });
-
-
-    it("ignores unknown commands", () => {
-      const { context, self } = entities.user;
-      const target = "#test_target";
-      const msg = `${process.env.PREFIX}someRandomCommand test message`;
-      const response = `@${context["display-name"]}, enter a valid command.`;
-
-      onMessageHandler(target, context, msg, self);
-      expect(executeCommandSpy.mock.calls.length).toBe(1);
-      expect(executeCommandSpy.mock.results[0].value).toBe(response);
-      responseQueue.dequeue();
-    });
-
-
-    it("replace multiple whitespaces with a single whitespace", () => {
+    it("should push a response to intended channel's response queue", () => {
       const responseQueueEnqueueSpy = jest.spyOn(responseQueue, "enqueue");
 
       const { context, self } = entities.user;
-      const target = "#test_target";
-      const response = `@${context["display-name"]}, enter a valid command.`;
-      const expectedRequest = `${process.env.PREFIX}testCmd user test message`;
-      let msg = `${process.env.PREFIX}testCmd             `;
-      msg += "user             test message                     ";
+      const request = `${testPrefix}command`;
 
-      onMessageHandler(target, context, msg, self);
-      expect(executeCommandSpy.mock.calls.length).toBe(1);
-      expect(executeCommandSpy.mock.results[0].value).toBe(response);
-      expect((executeCommandSpy.mock.calls[0][1]).join(" "))
-        .toBe(expectedRequest);
-
+      onMessageHandler(target, context, request, self);
       expect(responseQueueEnqueueSpy.mock.calls.length).toBe(1);
 
       const responseState = responseQueueEnqueueSpy.mock.calls[0][0];
       expect(responseState.target).toBe(target);
-      expect(responseState.request).toBe(expectedRequest);
-      expect(responseState.response).toBe(response);
-      responseQueue.dequeue();
+      expect(responseState.request).toBe(request);
+      expect(responseState.response).toBe(testResponse);
     });
 
+    it("must replace multiple whitespaces with a single whitespace", () => {
+      const { context, self } = entities.user;
+      const expectedRequest = `${process.env.PREFIX}command user test message`;
+      const request = `${testPrefix}command             ` +
+        "user             test message                     ";
 
-    it("ignore messages from bot's own request", () => {
-      const { context, self } = entities.bot;
-      const target = "#test_target";
-      const msg = "!ping";
-
-      onMessageHandler(target, context, msg, self);
-      expect(executeCommandSpy.mock.calls.length).toBe(0);
+      onMessageHandler(target, context, request, self);
+      expect(executeCommandSpy.mock.calls.length).toBe(1);
+      expect((executeCommandSpy.mock.calls[0][1]).join(" "))
+        .toBe(expectedRequest);
     });
+
 
     afterEach(() => {
-      executeCommandSpy.mockClear();
+      responseQueue.dequeue();
     });
   });
 
 
-  afterAll(() => {
-    // Empty response queue to avoid open handles.
-    while (!responseQueue.isEmpty()) responseQueue.dequeue();
+  describe("for valid commands without a response", () => {
+    it("should ignore messages from bot's own request", () => {
+      const { context, self } = entities.bot;
+      const request = `${testPrefix}command`;
+
+      onMessageHandler(target, context, request, self);
+      expect(executeCommandSpy.mock.calls.length).toBe(0);
+    });
+
+    it("throws an error if environment variable 'PREFIX' is not set", () => {
+      const { context, self } = entities.user;
+      const request = `${testPrefix}command`;
+
+      delete process.env.PREFIX;
+
+      expect(() => onMessageHandler(target, context, request, self))
+        .toThrow("Environment variable 'PREFIX' is not set.");
+    });
+
+    it("throws an error if environment variable 'USERNAME' is not set", () => {
+      const { context, self } = entities.user;
+      const request = `${testPrefix}command`;
+
+      delete process.env.USERNAME;
+
+      expect(() => onMessageHandler(target, context, request, self))
+        .toThrow("Environment variable 'USERNAME' is not set.");
+    });
+
+    it("throws an error for undefined context's display-name property", () => {
+      const { context, self } = entities.user;
+      const request = `${testPrefix}command`;
+
+      const modifiedContext = { ...context, ["display-name"]: undefined };
+      expect(() => onMessageHandler(target, modifiedContext, request, self))
+        .toThrow("display name was not supplied.");
+    });
+
+    it("should ignore messages from unauthorized user", () => {
+      const { context, self } = entities.user;
+      const request = `${testPrefix}command`;
+
+      const loggerSpy = jest.spyOn(console, "info");
+      loggerSpy.mockClear();
+
+      const username = process.env.USERNAME;
+      const endUser = "notjustintv"; // Change authorization.
+      process.env.USERNAME = endUser;
+
+      onMessageHandler(target, context, request, self);
+      expect(executeCommandSpy.mock.calls.length).toBe(0);
+      expect(loggerSpy.mock.calls[0][0])
+        .toBe(`\n* Environment variable 'USERNAME' is set to ${endUser}.`);
+      expect(loggerSpy.mock.calls[1][0])
+        .toBe(`* ${username} has no privilege to execute any command.`);
+    });
+  });
+
+
+  describe("for invalid commands", () => {
+    it("with no prefix should be ignored", () => {
+      const { context, self } = entities.user;
+      const request = "ping";
+
+      onMessageHandler(target, context, request, self);
+      expect(executeCommandSpy.mock.calls.length).toBe(0);
+    });
+
+    it("with an unknown prefix should be ignored", () => {
+      const { context, self } = entities.user;
+
+      process.env.PREFIX = "$"; // Change command prefix.
+      const request = "!ping";
+
+      onMessageHandler(target, context, request, self);
+      expect(executeCommandSpy.mock.calls.length).toBe(0);
+    });
+  });
+
+
+  afterEach(() => {
+    executeCommandSpy.mockClear();
   });
 });

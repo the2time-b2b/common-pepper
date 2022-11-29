@@ -34,9 +34,7 @@ client.on("message", function(
     throw new Error(`Channel state doesn't exist for ${nonPrefixedUsername}.`);
   }
 
-  try {
-    onMessageHandler(channel, context, message, self);
-  }
+  try { onMessageHandler(channel, context, message, self); }
   catch (err: unknown) {
     logger.info("* Command could not be executed: " + message);
     console.error(err);
@@ -72,25 +70,23 @@ export function onMessageHandler(
   const prefixLength = prefix.length;
   if (!(request.substring(0, prefixLength) === prefix)) return;
 
-  if (process.env.NODE_ENV !== "test") {
-    const endUser = process.env.USERNAME;
-    if (!endUser) {
-      throw new Error("Environment variable 'USERNAME' is not set.");
-    }
-
-    if (context["display-name"] === undefined) {
-      throw new Error("display name was not supplied.");
-    }
-    const username = context["display-name"].toLowerCase();
-
-    if (username !== endUser.toLowerCase()) {
-      logger.info(`\n* Environment variable 'USERNAME' is set to ${endUser}.`);
-      logger.info(`* ${username} has no privilege to execute any command.`);
-      return;
-    }
-
-    logger.info(`\n* Raw request "${request}" Received`);
+  const endUser = process.env.USERNAME;
+  if (!endUser) {
+    throw new Error("Environment variable 'USERNAME' is not set.");
   }
+
+  if (context["display-name"] === undefined) {
+    throw new Error("display name was not supplied.");
+  }
+  const username = context["display-name"].toLowerCase();
+
+  if (username !== endUser.toLowerCase()) {
+    logger.info(`\n* Environment variable 'USERNAME' is set to ${endUser}.`);
+    logger.info(`* ${username} has no privilege to execute any command.`);
+    return;
+  }
+
+  logger.info(`\n* Raw request "${request}" Received`);
 
   /*
   * Trims whitespace on either side of the chat message and replaces
