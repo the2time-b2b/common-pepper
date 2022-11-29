@@ -78,7 +78,7 @@ class Channel {
                 this, client, this.#bypassInterval, this.#resendLimit
               );
             }
-            catch (err) {
+            catch (err: unknown) {
               if (!(err instanceof Error)) throw new Error("Unhandled error.");
 
               const responseState = this.#responseQueue.retrieve();

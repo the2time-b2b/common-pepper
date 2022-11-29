@@ -1,16 +1,18 @@
-require("dotenv").config();
-
-const Client = require("../types/client");
-const Response = require("../types/response");
-const MessageState = require("../types/channel").MessageState;
+import Client from "../types/client";
+import Response from "../types/response";
+import { MessageState } from "../types/channel";
 
 
 const client = new Client({}); // Dummy options
-const testMessageState = new MessageState();
+const testMessageState: MessageState = {
+  messageLastSent: null,
+  recentMessage: null
+};
 
 beforeEach(() => {
   client.changeMessageInterval(0); // Preset interval interferes with test.
-  testMessageState.nextMessageState(null, null);
+  testMessageState.messageLastSent = null;
+  testMessageState.recentMessage = null;
   jest.clearAllMocks();
 });
 
@@ -84,27 +86,28 @@ describe("watch the set SEND_INTERVAL value and respond if", () => {
 
 /**
  * Test the client instance response.
- * @param {string} message - A response message.
- * @param {boolean} [circumvented=false] - Expect a duplication filter
- * circumvented response.
- * @param {boolean} [rejection=false] - Test for promise rejections.
+ * @param message - A response message.
+ * @param circumvented - Expect a duplication filter circumvented
+ * response.
+ * @param rejection - Test for promise rejections.
  */
 async function testClientResponse(
-  message, circumvented = false, rejection = false
-) {
+  message: string, circumvented = false, rejection = false
+): Promise<void> {
   const channel = "#sven_snusberg";
   const filterByPassChar = "\udb40\udc00";
 
-  let response;
-
+  let response: Array<string> = [];
   try {
     const username = channel.substring(1);
-    const responseState = new Response(null, username, message);
-    response = await client.say(responseState, testMessageState);
-    testMessageState.nextMessageState(message, Date.now());
+    const responseState = new Response("", username, message);
+    response = await client.send(responseState, testMessageState, 30);
+    testMessageState.recentMessage = message;
+    testMessageState.messageLastSent = Date.now();
   }
-  catch (err) {
+  catch (err: unknown) {
     if (rejection) {
+      if (!(err instanceof Error)) throw err;
       expect(err.name).toBe("messageIntervalError");
       return;
     }

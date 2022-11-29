@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   "validCommandList": [
     "this is a test message every 1:0:0 on channel named task-name",
     "this is a another test message every 30:0 on channel named task-name2",

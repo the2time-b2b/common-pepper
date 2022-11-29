@@ -56,7 +56,7 @@ client.on("message", function(
  * @param self Flag that specifies whether command/message orignated from the
  * current bot's instance.
  */
-function onMessageHandler(
+export function onMessageHandler(
   target: string,
   context: ChatUserstate,
   request: string,
@@ -101,6 +101,7 @@ function onMessageHandler(
   const modifiedRequest = splitModifiedRequest.join(" ");
 
   const botResponse = executeCommand(context, splitModifiedRequest);
+
   const responseState = new BotResponse(modifiedRequest, channel, botResponse);
 
   const responseQueue = Channel.getResponseQueue(channel);
@@ -116,6 +117,3 @@ client.on("connected", function(address: string, port: number): void {
 if (process.env.NODE_ENV !== "test") {
   client.connect().catch((err: unknown) => console.error(err));
 }
-
-
-if (process.env.NODE_ENV === "test") module.exports = onMessageHandler;
