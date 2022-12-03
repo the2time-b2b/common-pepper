@@ -43,9 +43,13 @@ module.exports = {
     "object-curly-spacing": ["error", "always"],
     "quotes": ["error", "double"],
     "space-in-parens": ["error", "never"],
-    "space-before-function-paren": ["error", "never"],
     "spaced-comment": ["error", "always"],
 
+    "space-before-function-paren": ["error", {
+        "anonymous": "never",
+        "named": "never",
+        "asyncArrow": "never"
+    }],
     "arrow-spacing": [
       "error",
       { "before": true, "after": true }

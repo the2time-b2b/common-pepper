@@ -54,7 +54,6 @@ export default class ClientExtension extends Client {
     const messageInterval = this.#messageInterval;
     const lastSent = messageState.messageLastSent;
 
-
     /*
     * Prevents intentional/unintentional global cooldown.
     * DUPMSG_STATUS initially set to null for first bot's message after reset
@@ -73,23 +72,21 @@ export default class ClientExtension extends Client {
       }
       else responseState.activateDuplicationFilterByass(false);
 
-      if (nodeEnv === "live") {
+      if (nodeEnv !== "dev") {
         responseState.resendCount++;
-        return super.say(responseState.target, responseState.response);
+        return this.say(responseState.target, responseState.response);
       }
     }
 
     return new Promise((resolve, reject) => {
       if (elapsed < messageInterval) {
-        const error = new Error();
-        error.name = "messageIntervalError";
-        error.message = "Message is being sent too quickly.";
-
+        const error = new Error("Message is being sent too quickly.");
         reject(error);
       }
 
+      // For dev
       responseState.resendCount++;
-      resolve([responseState.target, responseState.response]); // For dev/test
+      resolve([responseState.target, responseState.response]); 
     });
   }
 
