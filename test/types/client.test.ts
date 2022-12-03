@@ -1,6 +1,6 @@
-import Client from "../types/client";
-import Response from "../types/response";
-import { MessageState } from "../types/channel";
+import Client from "../../types/client";
+import Response from "../../types/response";
+import { MessageState } from "../../types/channel";
 
 
 // Method say always to return Promise<string[]> instead of Promise<[string]>.

@@ -86,7 +86,7 @@ export default class ClientExtension extends Client {
 
       // For dev
       responseState.resendCount++;
-      resolve([responseState.target, responseState.response]); 
+      resolve([responseState.target, responseState.response]);
     });
   }
 
