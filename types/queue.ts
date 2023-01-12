@@ -10,11 +10,20 @@ export default class Queue<Item> {
 
 
   /**
-   * Inserts an item of a specific type to the queue.
-   * @param {T} item An item to be inserted at the last in a queue.
-   */
+    * Retrieve the queue itself.
+    * @returns {Array<Item>} Returns the queue of the instance in it's raw
+    * format of an array of items of a particular type.
+    */
+  getQueue(): Array<Item> {
+    return this.#queue;
+  }
+
+
+  /**
+    * Inserts an item of a specific type to the queue.
+    * @param {T} item An item to be inserted at the last in a queue.
+    */
   enqueue(item: Item): void {
-    if (!item) throw new Error("An item to be enqueue is missing.");
     if (this.#beforeEnqueueCallback) this.#beforeEnqueueCallback();
     this.#queue.push(item);
   }
@@ -31,9 +40,9 @@ export default class Queue<Item> {
 
 
   /**
-   * Retrieve an item of a specific type from the queue.
-   * @returns {T} First item from the queue.
-   */
+    * Retrieve an item of a specific type from the queue.
+    * @returns {T} First item from the queue.
+    */
   retrieve(): Item {
     if (this.#queue.length > 0) return this.#queue[0];
     throw new Error("Cannot retrieve an item from an empty queue.");

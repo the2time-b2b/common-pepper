@@ -11,6 +11,7 @@
     "dev:prod": "cross-env NODE_ENV=live ts-node-dev common-pepper.ts",
     "dev": "cross-env NODE_ENV=dev ts-node-dev common-pepper.ts",
     "test": "cross-env NODE_ENV=test jest --silent --setupFiles dotenv/config",
+    "test:shownest": "cross-env NODE_ENV=test jest --silent --verbose --setupFiles dotenv/config",
     "test:log": "cross-env NODE_ENV=test jest --setupFiles dotenv/config",
     "test:watch": "cross-env NODE_ENV=test jest --watch --setupFiles dotenv/config",
     "test:coverage": "cross-env NODE_ENV=test jest --setupFiles dotenv/config --coverage=true --coverageDirectory=coverage --coverageProvider=v8",
