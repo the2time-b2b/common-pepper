@@ -26,6 +26,9 @@ class Channel {
   /** Message duplication cooldown period. */
   #bypassInterval = 30;
 
+  /** Interval in which the response queue is polled. */
+  #pollingInterval = 5000;
+
   /** Current message state of a channel. */
   #messageState: MessageState = {
     recentMessage: null,
@@ -49,7 +52,12 @@ class Channel {
    * @param resendLimit  Number of resends before the response is dequeued
    * automatically.
    */
-  constructor(client: Client, username: string, resendLimit?: number) {
+  constructor(
+    client: Client,
+    username: string,
+    resendLimit?: number,
+    pollingInterval?: number
+  ) {
     const isValidUsername = username.match(/^[a-zA-Z0-9_]{4,25}$/);
     if (!isValidUsername) throw new Error(
       "Invalid username: '" + username + "'. " +
@@ -62,6 +70,7 @@ class Channel {
 
     this.#username = username;
     if (resendLimit) this.#resendLimit;
+    if (pollingInterval) this.#pollingInterval;
 
     /**
      * Orderly manage multiple bot responses on a channel.
@@ -69,30 +78,28 @@ class Channel {
      * based on the presence of atleast one response in a queue.
      */
     const beforeEnqueueCallback = function(this: Channel): void {
-      if (this.#responseQueue.isEmpty()) {
-        const pollingInterval = 5000;
-        this.#setIntervalID = setInterval(
-          () => {
-            try {
-              responseManager(
-                this, client, this.#bypassInterval, this.#resendLimit
-              );
-            }
-            catch (err: unknown) {
-              if (!(err instanceof Error)) throw new Error("Unhandled error.");
+      if (!this.#responseQueue.isEmpty()) return;
+      this.#setIntervalID = setInterval(
+        () => {
+          try {
+            responseManager(
+              this, client, this.#bypassInterval, this.#resendLimit
+            );
+          }
+          catch (err: unknown) {
+            if (!(err instanceof Error)) throw new Error("Unhandled error.");
 
-              const responseState = this.#responseQueue.retrieve();
-              const request = responseState.request;
-              const target = responseState.target;
-              const response = responseState.response;
-              logger.info(`\n* Could not execute "${request}" command`);
-              logger.info("* Details:", JSON.stringify({ target, response }));
-              console.error(err.message);
-            }
-          },
-          pollingInterval
-        );
-      }
+            const responseState = this.#responseQueue.retrieve();
+            const request = responseState.request;
+            const target = responseState.target;
+            const response = responseState.response;
+            logger.info(`\n* Could not execute "${request}" command`);
+            logger.info("* Details:", JSON.stringify({ target, response }));
+            console.error(err.message);
+          }
+        },
+        this.#pollingInterval
+      );
     };
     this.#responseQueue.beforeEnqueue(beforeEnqueueCallback.bind(this));
 
@@ -119,12 +126,12 @@ class Channel {
       if (nonPrefixedUsername !== this.#username)
         throw new Error("Channel should and can have only one unique listner.");
     });
-    if (process.env.NODE_ENV !== "test") {
-      this.#listner.connect().catch((err: unknown) => {
+    this.#listner.connect().catch((err: unknown) => {
+      if (process.env.NODE_ENV !== "test") {
         console.error("Listener cannot join channel: " + this.#username);
         console.error(err);
-      });
-    }
+      }
+    });
 
     Channel.#channels[this.#username] = this;
   }
@@ -141,7 +148,7 @@ class Channel {
   static getChannel(username: string): Channel {
     const channel = Channel.#channels[username];
     if (!channel) {
-      throw new Error(`The channel '${channel}' has not been initialized.`);
+      throw new Error(`The channel '${username}' has not been initialized.`);
     }
     return channel;
   }
@@ -207,9 +214,12 @@ class Channel {
   }
 
 
-  /** Check if a listner exists on the channel. */
+  /** Check if a listner has joined a channel in twitch.tv. */
   checkListner(): boolean {
-    const [channel] = this.#listner.getChannels();
+    const listners = this.#listner.getChannels();
+    if (listners.length === 0) return false;
+
+    const [channel] = listners;
     const username = channel.substring(1);
     if (username === this.#username) return true;
     return false;
@@ -251,15 +261,15 @@ class Channel {
    * @param resendLimit  Number of times a response resent before it is removed
    * from the queue automatically.
    */
-function responseManager(
+export async function responseManager(
   channel: Channel, client: Client, bypassInterval: number, resendLimit: number
-): void {
+): Promise<void> {
   const responseQueue = channel.getResponseQueue();
-  if (responseQueue.isEmpty()) return;
+  if (responseQueue.isEmpty()) {
+    throw new Error("Cannot handle responses from an empty queue.");
+  }
 
   let responseState = responseQueue.retrieve();
-
-
   if (responseState.resendCount > resendLimit) {
     responseQueue.dequeue();
     if (responseQueue.isEmpty()) return;
@@ -278,28 +288,30 @@ function responseManager(
    */
   const messageState = channel.getMessageState();
 
-  client.send(responseState, messageState, bypassInterval)
-    .then(responseStatus => {
-      if (process.env.NODE_ENV !== "live") {
-        logger.info();
-        if (responseState.request) {
-          logger.info(`* Executed "${responseState.request}" command`);
-        }
+  let response;
+  try {
+    response = await client.send(responseState, messageState, bypassInterval);
 
-        logger.info("* Details:", JSON.stringify(
-          { target: responseStatus[0], response: responseStatus[1] }
-        ));
+    if (process.env.NODE_ENV !== "live") {
+      logger.info("\n* Details:", JSON.stringify(
+        { target: response[0], response: response[1] }
+      ));
 
-        messageState.recentMessage = responseState.response;
-        messageState.messageLastSent = Date.now();
-
-        responseQueue.dequeue();
+      if (responseState.request) {
+        logger.info(`* Executed "${responseState.request}" command`);
       }
-    })
-    .catch(err => {
-      if (!(err instanceof Error)) throw err;
-      if (err.name !== "sendIntervalError") console.error(err);
-    });
+
+      messageState.recentMessage = responseState.response;
+      messageState.messageLastSent = Date.now();
+
+      responseQueue.dequeue();
+    }
+  }
+  catch (err: unknown) {
+    if (!(err instanceof Error)) throw err;
+    if (err.name !== "sendIntervalError") console.error(err);
+  }
+
 }
 
 

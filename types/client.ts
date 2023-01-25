@@ -5,10 +5,7 @@ import type BotResponse from "./response";
 
 
 export default class ClientExtension extends Client {
-  /**
-   * Cooldown period between two consecutive bot responses.
-   * @type {number}
-  */
+  /** Cooldown period between two consecutive bot responses. */
   #messageInterval = 30;
 
 

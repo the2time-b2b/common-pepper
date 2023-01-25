@@ -1,6 +1,4 @@
-import Client from "../types/client";
 import Channel from "../types/channel";
-
 
 import { onMessageHandler } from "../common-pepper";
 import * as executeCommand from "../commands";
@@ -8,12 +6,17 @@ import * as executeCommand from "../commands";
 import entities from "./context";
 
 
+jest.mock("../types/channel");
+jest.mock("../commands");
+jest.mock("../config"); // Prevent connection to actual credentials.
+
+
+const mockEnqueue = jest.fn();
+Channel.getResponseQueue = jest.fn().mockReturnValue({ enqueue: mockEnqueue });
+
+
 describe("message handler", () => {
   const testPrefix = "!";
-  const dummyClient = new Client({});
-  const testChannel = new Channel(dummyClient, "test_target");
-  const responseQueue = testChannel.getResponseQueue();
-
   const target = "#test_target";
   const testResponse = "test response";
 
@@ -40,25 +43,15 @@ describe("message handler", () => {
         .toBe(`\n* Raw request "${request}" Received`);
     });
 
-    it("should get the intended response", () => {
-      const { context, self } = entities.user;
-      const request = `${testPrefix}command`;
-
-      onMessageHandler(target, context, request, self);
-      expect(executeCommandSpy.mock.calls.length).toBe(1);
-      expect(executeCommandSpy.mock.results[0].value).toBe(testResponse);
-    });
 
     it("should push a response to intended channel's response queue", () => {
-      const responseQueueEnqueueSpy = jest.spyOn(responseQueue, "enqueue");
-
       const { context, self } = entities.user;
       const request = `${testPrefix}command`;
 
       onMessageHandler(target, context, request, self);
-      expect(responseQueueEnqueueSpy.mock.calls.length).toBe(1);
+      expect(mockEnqueue.mock.calls.length).toBe(1);
 
-      const responseState = responseQueueEnqueueSpy.mock.calls[0][0];
+      const responseState = mockEnqueue.mock.calls[0][0];
       expect(responseState.target).toBe(target);
       expect(responseState.request).toBe(request);
       expect(responseState.response).toBe(testResponse);
@@ -74,11 +67,6 @@ describe("message handler", () => {
       expect(executeCommandSpy.mock.calls.length).toBe(1);
       expect((executeCommandSpy.mock.calls[0][1]).join(" "))
         .toBe(expectedRequest);
-    });
-
-
-    afterEach(() => {
-      responseQueue.dequeue();
     });
   });
 
@@ -165,5 +153,7 @@ describe("message handler", () => {
 
   afterEach(() => {
     executeCommandSpy.mockClear();
+    mockEnqueue.mockClear();
   });
 });
+
