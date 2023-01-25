@@ -383,3 +383,100 @@ describe("the response queue manager is invoked", () => {
   });
 });
 
+
+describe("the lister handler is invoked", () => {
+  const client = new Client({});
+  const request = "test request";
+  const response = "test response";
+  const target = "test_user";
+
+  const getResponseQueueSpy = jest.spyOn(Channel.prototype, "getResponseQueue");
+  const isEmptySpy = jest.spyOn(MockedQueue.prototype, "isEmpty");
+  const queueRetrieveSpy = jest.spyOn(MockedQueue.prototype, "retrieve");
+  const loggerSpy = jest.spyOn(console, "info");
+  const nextMessageStateSpy = jest.spyOn(Channel.prototype, "nextMessageState");
+
+  afterEach(() => {
+    getResponseQueueSpy.mockClear();
+    isEmptySpy.mockClear();
+    queueRetrieveSpy.mockClear();
+    loggerSpy.mockClear();
+    nextMessageStateSpy.mockClear();
+  });
+
+  test("current item in front of the queue is discarded", () => {
+    jest.useFakeTimers();
+
+    const message = "test response";
+    const username = "test_user";
+    const context = { ["display-name"]: process.env.USERNAME };
+
+    new Channel(client, username);
+
+    isEmptySpy.mockReturnValue(false);
+    queueRetrieveSpy.mockReturnValue({ request, response, target });
+
+    Channel.onListenHandler(username, context, message);
+
+    expect(loggerSpy).nthCalledWith(1, `\n* Executed "${request}" command`);
+    expect(loggerSpy)
+      .nthCalledWith(2, "* Details:", JSON.stringify({ target, response }));
+    expect(nextMessageStateSpy).toHaveBeenCalledWith(response, Date.now());
+
+    jest.useFakeTimers();
+  });
+
+  test("ignore any entity that is not the authorized bot", () => {
+    const message = "test response";
+    const username = "test_user";
+    const context = { ["display-name"]: String(process.env.USERNAME) + "junk" };
+
+    Channel.onListenHandler(username, context, message);
+
+    expect(getResponseQueueSpy).not.toBeCalled();
+  });
+
+  test("return if there is no response in the queue to be dequeued", () => {
+    const message = "test response";
+    const username = "test_user";
+    const context = { ["display-name"]: process.env.USERNAME };
+
+    isEmptySpy.mockReturnValue(true);
+
+    new Channel(client, username);
+    Channel.onListenHandler(username, context, message);
+
+    expect(getResponseQueueSpy).toBeCalled();
+    expect(queueRetrieveSpy).not.toBeCalled();
+  });
+
+  test("unexpectedly response in the wrong channel", () => {
+    const message = "test response";
+    const username = "test_user123";
+    const context = { ["display-name"]: process.env.USERNAME };
+
+    isEmptySpy.mockReturnValue(false);
+    queueRetrieveSpy.mockReturnValue({ request, response, target });
+
+    new Channel(client, username);
+
+    expect(() => Channel.onListenHandler(username, context, message))
+      .toThrow(`Response intended for ${target} was targeted to ${username}`);
+  });
+
+  test("mismatch between listened response and response in queue front", () => {
+    const message = "different response";
+    const username = "test_user";
+    const context = { ["display-name"]: process.env.USERNAME };
+
+    isEmptySpy.mockReturnValue(false);
+    queueRetrieveSpy.mockReturnValue({ request, response, target });
+
+    new Channel(client, username);
+    Channel.onListenHandler(username, context, message);
+
+    expect(queueRetrieveSpy).toBeCalled();
+    expect(loggerSpy).not.toBeCalled();
+  });
+});
+

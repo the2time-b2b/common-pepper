@@ -115,8 +115,7 @@ class Channel {
     this.#responseQueue.afterDequeue(afterDequeueCallback.bind(this));
 
     this.#listner = new Client({ ...opts, channels: [username] });
-    const onListenHandler = this.#onListenHandler.bind(this);
-    this.#listner.on("message", onListenHandler);
+    this.#listner.on("message", Channel.onListenHandler);
 
     this.#listner.on("connected", (addr: string, port: number) => {
       logger.info(`* Listner connected on ${username} to ${addr}:${port}`);
@@ -182,24 +181,26 @@ class Channel {
 
   /**
    * Monitor bot responses.
-   * @param channel Username of the channel.
+   * @param username Username of the channel.
    * @param context Meta data of the user who message picked up by the listner.
    * @param message Bot message picked up by the listener on a target channel.
    */
-  #onListenHandler(
-    channel: string, context: ChatUserstate, message: string
+  static onListenHandler(
+    username: string, context: ChatUserstate, message: string
   ): void {
     const listenedUsername = String(context["display-name"]).toLowerCase();
     if (!(listenedUsername === process.env.USERNAME)) return;
 
-    if (this.#responseQueue.isEmpty()) return;
-    const responseState = this.#responseQueue.retrieve();
+    const user = Channel.getChannel(username);
+    const responseQueue = user.getResponseQueue();
+    if (responseQueue.isEmpty()) return;
+    const responseState = responseQueue.retrieve();
     const response = responseState.response;
     const request = responseState.request;
     const target = responseState.target;
 
-    if (channel !== target) {
-      const msg = `Response intended for ${target} was targeted to ${channel}`;
+    if (username !== target) {
+      const msg = `Response intended for ${target} was targeted to ${username}`;
       throw new Error(msg);
     }
 
@@ -208,9 +209,9 @@ class Channel {
     logger.info(`\n* Executed "${request}" command`);
     logger.info("* Details:", JSON.stringify({ target, response }));
 
-    this.nextMessageState(message, Date.now());
+    user.nextMessageState(message, Date.now());
 
-    this.#responseQueue.dequeue();
+    responseQueue.dequeue();
   }
 
 
