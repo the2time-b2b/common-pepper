@@ -21,6 +21,7 @@ function execute(context: ChatUserstate, request: Array<string>): string {
     /** Every key corresponds to a defined command. */
     [commandName: string]: Command
   }
+
   // Note: The name of the every key in 'commandList' object is lost.
   const commands: ICommandList = commandList;
 
