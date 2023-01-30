@@ -12,14 +12,14 @@ const ping: Command = {
     }
 
     const displayName = context["display-name"];
-    if (!displayName) throw new Error("Display name not supplies.");
+    if (!displayName) throw new Error("The display name is not supplied.");
 
     const botUsername = process.env.USERNAME;
     if (!botUsername) {
       throw new Error("Environment variable 'USERNAME' is not set.");
     }
 
-    if (botUsername) return "R) 7";
+    if (displayName.toLowerCase() === botUsername.toLowerCase()) return "R) 7";
     return `@${displayName.toLowerCase()}, R) 7`;
   }
 };
