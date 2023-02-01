@@ -51,6 +51,8 @@ class Tasks {
 
   /** Initialize pre-exisiting task saved in the local JSON database. */
   static init(): void {
+    console.log("INIT");
+    
     try {
       if (!fs.existsSync(Tasks.#databasePath)) {
         Tasks.#createJSONDatabase();
@@ -159,8 +161,6 @@ class Tasks {
     if (task.message) toModify.message = task.message;
 
     const modifiedTask = { ...oldTask, ...toModify };
-
-    if (typeof task.taskName === "undefined") throw new Error();
 
     let modifiedTaskName = task.taskName;
     if (!modifiedTaskName) {

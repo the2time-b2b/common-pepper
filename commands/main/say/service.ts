@@ -16,6 +16,12 @@ import {
 export function checkAttributeStructure(
   attributes: Array<string>
 ): attributes is CreateTaskStructure {
+  const createTaskKeys = Object.keys(CommandAttributes).filter(attr => {
+    return attr !== "message";
+  });
+  const createTaskKeyValueLength = createTaskKeys.length * 2;
+  if (attributes.length !== createTaskKeyValueLength) return false;
+
   if (attributes[0] !== CommandAttributes.interval) return false;
   if (attributes[2] !== CommandAttributes.channel) return false;
   if (attributes[4] !== CommandAttributes.taskName) return false;
@@ -25,13 +31,15 @@ export function checkAttributeStructure(
 
 
 /**
- * Check if a attribute supllied to be modified is correct.
+ * Check if a attribute supplied to be modified is correct.
  * @param attribute Attribute to be modified from an existing task.
  */
 export function validateModifyAttribute(
   attribute: string
 ): attribute is CommandAttributeValue {
-  if (Object.keys(CommandAttributes).includes(attribute)) return true;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const commandAttributeValues = Object.values(CommandAttributes) as any;
+  if ((commandAttributeValues).includes(attribute)) return true;
 
   return false;
 }
@@ -82,20 +90,16 @@ export function checkTaskName(taskName: string): boolean {
 export function parseInterval(interval: RawInterval): ParsedInterval {
   const timeParts = interval.split(":");
 
-  if (timeParts.length < 1 || timeParts.length > 3)
-    throw new Error("Time parts of an interval cannot be more than 3.");
-
-
   let parsedInterval: ParsedInterval;
   if (timeParts.length === 1) {
     parsedInterval = [parseInt(timeParts[0]), null, null];
   }
-  if (timeParts.length === 2) {
-    parsedInterval = [parseInt(timeParts[0]), parseInt(timeParts[1]), null];
+  else if (timeParts.length === 2) {
+    parsedInterval = [parseInt(timeParts[1]), parseInt(timeParts[0]), null];
   }
   else {
     parsedInterval = [
-      parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2])
+      parseInt(timeParts[2]), parseInt(timeParts[1]), parseInt(timeParts[0])
     ];
   }
   return parsedInterval;

@@ -26,9 +26,9 @@ export type CommandAttributeValue = typeof CommandAttributes[CommandAttribute];
 export type TaskAttribute = Exclude<CommandAttribute, "taskName">;
 
 
-const MessageTaskAttribute = { message: CommandAttributes.message } as const;
-type MessageAttribute = keyof typeof MessageTaskAttribute;
-type MessageAttributeValue = typeof MessageTaskAttribute[MessageAttribute];
+const IntervalTaskAttribute = { interval: CommandAttributes.interval } as const;
+type IntervalAttribute = keyof typeof IntervalTaskAttribute;
+type IntervalAttributeValue = typeof IntervalTaskAttribute[IntervalAttribute];
 
 const ChannelTaskAttribute = { channel: CommandAttributes.channel } as const;
 type ChannelAttribute = keyof typeof ChannelTaskAttribute;
@@ -38,13 +38,14 @@ const TaskNameTaskAttribute = { taskName: CommandAttributes.taskName } as const;
 type TaskNameAttribute = keyof typeof TaskNameTaskAttribute;
 type TaskNameAttributeValue = typeof TaskNameTaskAttribute[TaskNameAttribute];
 
+
 /** Ordered attribute structure used to create a task. */
 export type CreateTaskStructure = [
-  intervalAttribute: Extract<MessageAttributeValue, CommandAttributeValue>,
+  intervalAttribute: IntervalAttributeValue,
   interval: string,
-  channelAttribute: Extract<ChannelAttributeValue, CommandAttributeValue>,
+  channelAttribute: ChannelAttributeValue,
   channel: string,
-  taskNameAttribute: Extract<TaskNameAttributeValue, CommandAttributeValue>,
+  taskNameAttribute: TaskNameAttributeValue,
   taskName: string,
 ];
 

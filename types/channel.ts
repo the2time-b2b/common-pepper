@@ -191,7 +191,7 @@ class Channel {
     const listenedUsername = String(context["display-name"]).toLowerCase();
     if (!(listenedUsername === process.env.USERNAME)) return;
 
-    const user = Channel.getChannel(username);
+    const user = Channel.getChannel(username.substring(1));
     const responseQueue = user.getResponseQueue();
     if (responseQueue.isEmpty()) return;
     const responseState = responseQueue.retrieve();

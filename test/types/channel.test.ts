@@ -275,7 +275,7 @@ describe("the response queue manager is invoked", () => {
     getMessageStateSpy.mockClear();
   });
 
-  const target = "justintv";
+  const target = "#justintv";
   const response = "test response";
   sendSpy.mockResolvedValue([target, response]);
 
@@ -388,7 +388,7 @@ describe("the lister handler is invoked", () => {
   const client = new Client({});
   const request = "test request";
   const response = "test response";
-  const target = "test_user";
+  const target = "#test_user";
 
   const getResponseQueueSpy = jest.spyOn(Channel.prototype, "getResponseQueue");
   const isEmptySpy = jest.spyOn(MockedQueue.prototype, "isEmpty");
@@ -416,7 +416,7 @@ describe("the lister handler is invoked", () => {
     isEmptySpy.mockReturnValue(false);
     queueRetrieveSpy.mockReturnValue({ request, response, target });
 
-    Channel.onListenHandler(username, context, message);
+    Channel.onListenHandler("#" + username, context, message);
 
     expect(loggerSpy).nthCalledWith(1, `\n* Executed "${request}" command`);
     expect(loggerSpy)
@@ -431,7 +431,7 @@ describe("the lister handler is invoked", () => {
     const username = "test_user";
     const context = { ["display-name"]: String(process.env.USERNAME) + "junk" };
 
-    Channel.onListenHandler(username, context, message);
+    Channel.onListenHandler("#" + username, context, message);
 
     expect(getResponseQueueSpy).not.toBeCalled();
   });
@@ -444,7 +444,7 @@ describe("the lister handler is invoked", () => {
     isEmptySpy.mockReturnValue(true);
 
     new Channel(client, username);
-    Channel.onListenHandler(username, context, message);
+    Channel.onListenHandler("#" + username, context, message);
 
     expect(getResponseQueueSpy).toBeCalled();
     expect(queueRetrieveSpy).not.toBeCalled();
@@ -460,8 +460,8 @@ describe("the lister handler is invoked", () => {
 
     new Channel(client, username);
 
-    expect(() => Channel.onListenHandler(username, context, message))
-      .toThrow(`Response intended for ${target} was targeted to ${username}`);
+    expect(() => Channel.onListenHandler("#" + username, context, message))
+      .toThrow(`Response intended for ${target} was targeted to #` + username);
   });
 
   test("mismatch between listened response and response in queue front", () => {
@@ -473,7 +473,7 @@ describe("the lister handler is invoked", () => {
     queueRetrieveSpy.mockReturnValue({ request, response, target });
 
     new Channel(client, username);
-    Channel.onListenHandler(username, context, message);
+    Channel.onListenHandler("#" + username, context, message);
 
     expect(queueRetrieveSpy).toBeCalled();
     expect(loggerSpy).not.toBeCalled();
