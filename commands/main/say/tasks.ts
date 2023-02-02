@@ -1,5 +1,5 @@
 import fs from "fs";
-import { default as Scheduler, ParsedTask, ParsedTasks } from "./scheduler";
+import { default as Scheduler, ParsedTask } from "./scheduler";
 
 import path from "path";
 import { CommandAttributes, TaskAttribute } from "./types";
@@ -51,25 +51,22 @@ class Tasks {
 
   /** Initialize pre-exisiting task saved in the local JSON database. */
   static init(): void {
-    console.log("INIT");
-    
     try {
-      if (!fs.existsSync(Tasks.#databasePath)) {
-        Tasks.#createJSONDatabase();
-      }
+      if (!fs.existsSync(Tasks.#databasePath)) Tasks.#createJSONDatabase();
 
       const tasks = Tasks.retrieveTasks();
       const taskNames = Object.keys(tasks);
       const taskList = Object.values(tasks);
 
-      const parsedTasks: ParsedTasks = {};
+      const parsedTasks = [];
       for (let i = 0; i < taskNames.length; i++) {
         const task = taskList[i];
         const parsedTask = {
           ...task,
-          "interval": Number(task.interval)
+          "interval": Number(task.interval),
+          taskName: taskNames[i]
         };
-        parsedTasks[`${taskNames[i]}`] = parsedTask;
+        parsedTasks.push(parsedTask);
       }
 
       Scheduler.init(parsedTasks);
@@ -119,6 +116,7 @@ class Tasks {
    */
   static createTask(task: Task): string {
     const tasks = Tasks.retrieveTasks();
+
     if (tasks[task.taskName])
       return `Task '${task.taskName}' already exists.`;
 
@@ -130,7 +128,7 @@ class Tasks {
     const parsedTask: ParsedTask = {
       ...task, "interval": Number(task.interval)
     };
-    Scheduler.addTask(parsedTask, task.taskName);
+    Scheduler.addTask(parsedTask);
 
     return `Task ${task.taskName} activated on channel ${task.channel}.`;
   }
@@ -174,9 +172,11 @@ class Tasks {
     Tasks.#storeTask([tasks]);
 
     const parsedTask: ParsedTask = {
-      ...modifiedTask, "interval": Number(modifiedTask.interval)
+      ...modifiedTask,
+      "interval": Number(modifiedTask.interval),
+      taskName: modifiedTaskName
     };
-    Scheduler.addTask(parsedTask, modifiedTaskName);
+    Scheduler.addTask(parsedTask);
 
     return `Task ${taskName} successfully modified.`;
   }
@@ -224,9 +224,9 @@ class Tasks {
   * [
    * {
       *         "<task_name>": {
-   *             "totalWaitInterval": "<total_time_in_seconds>",
-      *             "channel": "<channel_name>",
-      *             "taskMessage": "<message>"
+   *             "interval": "<total_time_in_seconds>",
+   *             "channel": "<channel_name>",
+   *             "message": "<message>"
    *         }...
    *     }
    * ]
@@ -238,6 +238,8 @@ class Tasks {
   static validateJSON(db: unknown): db is DBSchema {
     if (!Array.isArray(db)) return false;
     if (db.length !== 1) return false;
+    if (typeof db[0] !== "object" || db[0] === null || Array.isArray(db[0]))
+      return false;
 
     const taskList = Object.values(db[0]);
     if (taskList.length > 0) {
@@ -274,7 +276,7 @@ Tasks.init();
  * Convert to a valid local JSON database task.
  * @param task Record of task attributes with its corresponding string values.
  */
-function getDBTask(task: Task): DBTask {
+export function getDBTask(task: Task): DBTask {
   return {
     "channel": task.channel,
     "interval": task.interval,
@@ -291,7 +293,7 @@ export type DBTask = Omit<Task, "taskName">;
 
 
 /** Schema of the list of tasks in the local JSON database. */
-type DBTasks = Record<string, DBTask>;
+export type DBTasks = Record<string, DBTask>;
 
 
 /** Schema of the local JSON database. */

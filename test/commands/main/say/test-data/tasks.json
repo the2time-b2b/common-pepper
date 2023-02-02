@@ -1,0 +1,383 @@
+{
+  "validTaskListStructs": [
+    [{}],
+    [
+      {
+        "task-1": {
+          "interval": 123,
+          "channel": "justin-tv",
+          "message": "test message"
+
+        }
+      }
+    ],
+    [
+      {
+        "task-1": {
+          "channel": "justin-tv",
+          "interval": 123,
+          "message": "test message"
+
+        }
+      }
+    ],
+    [
+      {
+        "task-1": {
+          "channel": "justin-tv",
+          "message": "test message",
+          "interval": 123
+
+        }
+      }
+    ],
+    [
+      {
+        "task-1": {
+          "message": "test message",
+          "interval": 123,
+          "channel": "justin-tv"
+
+        }
+      }
+    ],
+    [
+      {
+        "task-1": {
+          "message": "test message",
+          "channel": "justin-tv",
+          "interval": 123
+
+        }
+      }
+    ],
+    [
+      {
+        "task-1": {
+          "interval": 123,
+          "message": "test message",
+          "channel": "justin-tv"
+
+        }
+      }
+    ],
+    [
+      {
+        "task-1": {
+          "interval": 123,
+          "channel": "justin-tv",
+          "message": "test message"
+
+        },
+        "task-2": {
+          "interval": 123,
+          "channel": "justin-tv",
+          "message": "test message"
+
+        }
+      }
+    ],
+    [
+      {
+        "duplicate-valid-but-overwritten": {
+          "interval": 123,
+          "channel": "justin-tv",
+          "message": "test message"
+
+        },
+        "duplicate-valid-but-overwritten": {
+          "interval": 123,
+          "channel": "justin-tv",
+          "message": "test message"
+
+        }
+      }
+    ]
+  ],
+  "invalidTaskListStructs": [
+    [],
+    [
+     null 
+    ],
+    [
+      1, 2, 3, 4
+    ],
+    [
+      "a", "b"
+    ],
+    {
+      "task-name": []
+    },
+    [
+      {
+        "invalidLevel": {
+          "task-name": {
+            "interval": 3600,
+            "channel": "channel",
+            "message": "this is a test message"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "task-name": [
+          {
+            "interval": 3600
+          },
+          {
+            "channel": "channel"
+          },
+          {
+            "message": "this is a test message"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "task-name": [
+          [
+            "interval",
+            3600
+          ],
+          [
+            "channel",
+            "channel"
+          ],
+          [
+            "message",
+            "this is a test message"
+          ]
+        ]
+      }
+    ],
+    [
+      [
+        {
+          "task-name": {
+            "interval": 3600,
+            "channel": "channel",
+            "message": "this is a test message"
+          }
+        }
+      ]
+    ],
+    {
+      "task-name": {
+        "interval": 3600,
+        "channel": "channel",
+        "message": "this is a test message"
+      }
+    },
+    {
+      "interval": 3600,
+      "channel": "channel",
+      "message": "this is a test message"
+    },
+    [
+      {
+        "task-name": {
+          "time": 3600,
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "username": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "sendMessage": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "taskMessages": "this is a test message"
+        }
+      },
+      {
+        "tn": {
+          "interval": 3600,
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "taskMessages": "this is a test message"
+        }
+      },
+      {
+        "thisisaunnecessaryforty1charactertaskname": {
+          "interval": 3600,
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      },
+      {
+        "another-task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      },
+      {
+        "task-name": {
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "message": "this is a test message"
+        }
+      },
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      },
+      {
+        "task-name": {
+          "interval": 3600,
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel"
+        }
+      },
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      },
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "totalInterval": 3600,
+          "interval": 3600,
+          "channel": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "username": "channel",
+          "message": "this is a test message"
+        }
+      }
+    ],
+    [
+      {
+        "task-name": {
+          "interval": 3600,
+          "channel": "channel",
+          "message": "this is a test message",
+          "sendMessage": "this is a test message"
+        }
+      }
+    ]
+  ]
+}
+

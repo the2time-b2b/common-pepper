@@ -1,9 +1,13 @@
-import { ToadScheduler, SimpleIntervalJob, Task } from "toad-scheduler";
+import {
+  ToadScheduler,
+  SimpleIntervalJob,
+  Task as SchedulerTask
+} from "toad-scheduler";
 import Response from "./../../../types/response";
 import Channel from "./../../../types/channel";
 import Client from "./../../../types/client";
 
-import { DBTask } from "./tasks";
+import { Task } from "./tasks";
 
 import { opts } from "./../../../config";
 import * as logger from "./../../../utils/logger";
@@ -18,7 +22,7 @@ class Scheduler {
    * Initialize any saved tasks from the local JSON database.
    * @param tasks Tasks from the local JSON database that is to be initialized.
    */
-  static init(tasks: ParsedTasks): void {
+  static init(tasks: Array<ParsedTask>): void {
     if (process.env.NODE_ENV === "test") return;
 
     this.#client.on("connected", function(addr, port) {
@@ -26,10 +30,7 @@ class Scheduler {
     });
     this.#client.connect()
       .then(() => {
-        for (const taskName in tasks) {
-          const task = tasks[taskName];
-          Scheduler.addTask(task, taskName);
-        }
+        tasks.forEach(task => Scheduler.addTask(task));
       })
       .catch(err => { throw new Error(err); });
   }
@@ -39,9 +40,8 @@ class Scheduler {
    * Add a task to the scheduler that needs to be activated in channel specified
    * by the task object.
    * @param task The task to be added.
-   * @param name Unique name for the task.
    */
-  static addTask(task: ParsedTask, name: string): void {
+  static addTask(task: ParsedTask): void {
     if (process.env.NODE_ENV === "test") return;
 
     const username = task.channel;
@@ -71,13 +71,18 @@ class Scheduler {
 
     const responseQueue = user.getResponseQueue();
 
-    const toadTask = new Task("Recurring Bot Response", () => {
-      const request = "[scheduler -> command: say] Invoking task name: " + name;
+    const toadTask = new SchedulerTask("Recurring Bot Response", () => {
+      const request = "[scheduler -> command: say] Invoking task name: " +
+        task.taskName;
       const response = new Response(request, username, message);
       responseQueue.enqueue(response);
     });
 
-    const job = new SimpleIntervalJob({ seconds: interval }, toadTask, name);
+    const job = new SimpleIntervalJob(
+      { seconds: interval },
+      toadTask,
+      task.taskName
+    );
     Scheduler.#scheduler.addSimpleIntervalJob(job);
   }
 
@@ -95,10 +100,7 @@ class Scheduler {
 }
 
 
-export type ParsedTask = { "interval": number } & Omit<DBTask, "interval">;
-
-
-export type ParsedTasks = Record<string, ParsedTask>;
+export type ParsedTask = { "interval": number } & Omit<Task, "interval">;
 
 
 export default Scheduler;
