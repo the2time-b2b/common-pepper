@@ -6,10 +6,17 @@ import * as executeCommand from "../commands";
 import entities from "./context";
 
 
+// Prevents static auto-instantiation in '../commands/main/say/scheduler'.
+jest.mock("../types/client", () => {
+  return jest.fn().mockImplementation(() => {
+    return {
+      connect: jest.fn().mockResolvedValue(["", 0]),
+      on: jest.fn()
+    };
+  });
+});
 jest.mock("../types/channel");
 jest.mock("../commands");
-jest.mock("../config"); // Prevent connection to actual credentials.
-
 
 const mockEnqueue = jest.fn();
 Channel.getResponseQueue = jest.fn().mockReturnValue({ enqueue: mockEnqueue });
@@ -57,6 +64,7 @@ describe("message handler", () => {
       expect(responseState.response).toBe(testResponse);
     });
 
+
     it("must replace multiple whitespaces with a single whitespace", () => {
       const { context, self } = entities.user;
       const expectedRequest = `${process.env.PREFIX}command user test message`;
@@ -80,6 +88,7 @@ describe("message handler", () => {
       expect(executeCommandSpy.mock.calls.length).toBe(0);
     });
 
+
     it("throws an error if environment variable 'PREFIX' is not set", () => {
       const { context, self } = entities.user;
       const request = `${testPrefix}command`;
@@ -89,6 +98,7 @@ describe("message handler", () => {
       expect(() => onMessageHandler(target, context, request, self))
         .toThrow("Environment variable 'PREFIX' is not set.");
     });
+
 
     it("throws an error if environment variable 'USERNAME' is not set", () => {
       const { context, self } = entities.user;
@@ -100,6 +110,7 @@ describe("message handler", () => {
         .toThrow("Environment variable 'USERNAME' is not set.");
     });
 
+
     it("throws an error for undefined context's display-name property", () => {
       const { context, self } = entities.user;
       const request = `${testPrefix}command`;
@@ -108,6 +119,7 @@ describe("message handler", () => {
       expect(() => onMessageHandler(target, modifiedContext, request, self))
         .toThrow("display name was not supplied.");
     });
+
 
     it("should ignore messages from unauthorized user", () => {
       const { context, self } = entities.user;
@@ -138,6 +150,7 @@ describe("message handler", () => {
       onMessageHandler(target, context, request, self);
       expect(executeCommandSpy.mock.calls.length).toBe(0);
     });
+
 
     it("with an unknown prefix should be ignored", () => {
       const { context, self } = entities.user;

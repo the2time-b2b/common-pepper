@@ -22,17 +22,18 @@ class Scheduler {
    * Initialize any saved tasks from the local JSON database.
    * @param tasks Tasks from the local JSON database that is to be initialized.
    */
-  static init(tasks: Array<ParsedTask>): void {
-    if (process.env.NODE_ENV === "test") return;
-
+  static async init(tasks: Array<ParsedTask>): Promise<void> {
     this.#client.on("connected", function(addr, port) {
       logger.info(`* Scheduler for 'say' command connected to ${addr}:${port}`);
     });
     this.#client.connect()
       .then(() => {
         tasks.forEach(task => Scheduler.addTask(task));
+        Promise.resolve();
       })
-      .catch(err => { throw new Error(err); });
+      .catch(err => {
+        console.error(err);
+      });
   }
 
 
@@ -42,8 +43,6 @@ class Scheduler {
    * @param task The task to be added.
    */
   static addTask(task: ParsedTask): void {
-    if (process.env.NODE_ENV === "test") return;
-
     const username = task.channel;
     const interval = task.interval;
     const message = task.message;
@@ -83,6 +82,7 @@ class Scheduler {
       toadTask,
       task.taskName
     );
+
     Scheduler.#scheduler.addSimpleIntervalJob(job);
   }
 
@@ -92,8 +92,6 @@ class Scheduler {
    * @param name The unique name of the task to be removed.
    */
   static removeTask(name: string): void {
-    if (process.env.NODE_ENV === "test") return;
-
     const status = Scheduler.#scheduler.removeById(name);
     if (!status) throw new Error(`Non-existant task ${name} cannot be removed`);
   }
