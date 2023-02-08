@@ -20,13 +20,13 @@ const say: Say = {
     }
 
     // Ideally, each task attribute itself has an adjacent value.
-    const TaskAttributesLength = Object.values(CommandAttributes).length * 2;
+    const taskAttributesLength = Object.values(CommandAttributes).length * 2;
 
     // Task message argument does not have a key in a create task request.
-    if (request.length < TaskAttributesLength - 1) return description.usage;
+    if (request.length < taskAttributesLength - 1) return description.usage;
 
     // Remove task message argument from the request.
-    const attributesLength = TaskAttributesLength - 2;
+    const attributesLength = taskAttributesLength - 2;
     const attributes = request.splice(request.length - attributesLength);
 
     if (!service.checkAttributeStructure(attributes)) return description.usage;
@@ -114,6 +114,11 @@ const say: Say = {
       modifiedTask.taskName = modifiedValue;
     }
 
+    /**
+     *  Modification is done one attribute at a time.
+     *  But updateTask is extensible for more than one attribute.
+     *  Note: modifiedTask is a 'Partial' of type 'Task'.
+     */
     return Tasks.updateTask(taskName, modifiedTask);
   }
 };
