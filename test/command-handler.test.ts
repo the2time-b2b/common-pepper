@@ -3,8 +3,8 @@ import execute from "../commands";
 import * as commandList from "../commands/helper";
 
 
-type MockedCommand = Omit<Command, "exec"> & { exec: jest.Mock };
-type MockedCommandList = { [commands: string]: MockedCommand };
+type MockedCommand = Omit<Command, "exec"> & {exec: jest.Mock};
+type MockedCommandList = {[commands: string]: MockedCommand};
 
 jest.mock("../commands/helper", () => {
   return {
@@ -24,15 +24,19 @@ describe("when a command is sent and the handler is invoked", () => {
     process.env.PREFIX = prefix;
   });
 
-  test("command is successfully executed and result is returned", () => {
+  describe("command is successfully executed", () => {
     const context = { ["display-name"]: "justintv" };
     const request = ["!command1", "test", "command"];
+    let result: string;
 
-    const result = execute(context, request);
-
-    expect(mockedCommandList.command1.exec)
-      .toHaveBeenCalledWith(context, ["test", "command"]);
-    expect(result).toBe("command1 invoked");
+    test("the prefixed command is sliced from the request", () => {
+      result = execute(context, request);
+      expect(mockedCommandList.command1.exec)
+        .toHaveBeenCalledWith(context, ["test", "command"]);
+    });
+    test("and result is returned", () => {
+      expect(result).toBe("command1 invoked");
+    });
   });
 
   test("throw an error if the environment variable 'PREFIX is not set", () => {

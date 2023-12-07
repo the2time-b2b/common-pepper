@@ -12,6 +12,19 @@ import executeCommand from "./commands";
 import { opts } from "./config/";
 
 
+const nodeEnvironments = ["live", "dev", "test"];
+if (!process.env.NODE_ENV) {
+  logger.info("Environment variable NODE_ENV is not defined.");
+  process.exit(1);
+}
+
+if (!nodeEnvironments.includes(process.env.NODE_ENV)) {
+  logger.info("Environment variable NODE_ENV is invalid.");
+  logger.info("Allowed state values:", nodeEnvironments.join(", "));
+  process.exit(1);
+}
+
+
 // Create a client with our options
 const client = new Client(opts);
 
