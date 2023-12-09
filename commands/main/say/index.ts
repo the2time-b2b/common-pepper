@@ -1,6 +1,8 @@
 import { Say, CommandAttributes } from "./types";
 import * as service from "./service";
 import { default as Tasks, Task } from "./tasks";
+import Repeat from "./triggers/repeat";
+import ValidationError from "../../../utils/error";
 
 import description from "./description";
 
@@ -36,8 +38,17 @@ const say: Say = {
     const channel = attributes[3].toLowerCase();
     const taskName = attributes[5].toLowerCase();
 
-    const checkInterval = service.checkInterval(interval);
-    if (!checkInterval) return description.interval;
+    let repeat;
+    try {
+      repeat = new Repeat(interval);
+    }
+    catch(error) {
+      if (error instanceof ValidationError) {
+        return error.returnMesssage;
+      }
+
+      throw error;
+    }
 
     const checkChannelName = service.checkChannelName(channel);
     if (!checkChannelName) return description.channel;
@@ -45,16 +56,9 @@ const say: Say = {
     const checkTaskName = service.checkTaskName(taskName);
     if (!checkTaskName) return description["task-name"];
 
-    const parsedInterval = service.parseInterval(interval);
-    const validatedInterval = service.validateInterval(parsedInterval);
-    if (!validatedInterval) return description.interval;
-
-    const [seconds, minutes, hours] = parsedInterval;
-    const intervalInSeconds = service.convertToSeconds(seconds, minutes, hours);
-
     const newTask: Task = {
       "taskName": taskName,
-      "interval": intervalInSeconds.toString(),
+      "interval": repeat.Seconds.toString(),
       "channel": channel,
       "message": message
     };
@@ -86,18 +90,21 @@ const say: Say = {
       modifiedTask.message = modifiedValue;
     }
 
-    let intervalInSeconds: number | null = null;
     if (attribute === CommandAttributes.interval) {
-      if (!service.checkInterval(modifiedValue)) return description.interval;
+      let repeat;
+      try {
+        repeat = new Repeat(modifiedValue);
+      }
+      catch (error) {
+        if (error instanceof ValidationError) {
+          return error.returnMesssage;
+        }
 
-      const parsedInterval = service.parseInterval(modifiedValue);
-      const validatedInterval = service.validateInterval(parsedInterval);
-      if (!validatedInterval) return description.interval;
+        throw error;
+      }
 
-      const [seconds, minutes, hours] = parsedInterval;
-      intervalInSeconds = service.convertToSeconds(seconds, minutes, hours);
 
-      modifiedTask.interval = intervalInSeconds.toString();
+      modifiedTask.interval = repeat.Seconds.toString();
     }
 
     if (attribute === CommandAttributes.channel) {
