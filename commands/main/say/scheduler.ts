@@ -7,7 +7,7 @@ import Response from "./../../../types/response";
 import Channel from "./../../../types/channel";
 import Client from "./../../../types/client";
 
-import { Task } from "./tasks";
+import { DBTask } from "./tasks";
 
 import { opts } from "./../../../config";
 import * as logger from "./../../../utils/logger";
@@ -22,7 +22,7 @@ class Scheduler {
    * Initialize any saved tasks from the local JSON database.
    * @param tasks Tasks from the local JSON database that is to be initialized.
    */
-  static async init(tasks: Array<ParsedTask>): Promise<void> {
+  static async init(tasks: Array<DBTask>): Promise<void> {
     this.#client.on("connected", function(addr, port) {
       logger.info(`* Scheduler for 'say' command connected to ${addr}:${port}`);
     });
@@ -42,7 +42,7 @@ class Scheduler {
    * by the task object.
    * @param task The task to be added.
    */
-  static addTask(task: ParsedTask): void {
+  static addTask(task: DBTask): void {
     const username = task.channel;
     const interval = task.interval;
     const message = task.message;
@@ -72,7 +72,7 @@ class Scheduler {
 
     const toadTask = new SchedulerTask("Recurring Bot Response", () => {
       const request = "[scheduler -> command: say] Invoking task name: " +
-        task.taskName;
+        task.name;
       const response = new Response(request, username, message);
       responseQueue.enqueue(response);
     });
@@ -80,7 +80,7 @@ class Scheduler {
     const job = new SimpleIntervalJob(
       { seconds: interval },
       toadTask,
-      task.taskName
+      task.name
     );
 
     Scheduler.#scheduler.addSimpleIntervalJob(job);
@@ -98,7 +98,6 @@ class Scheduler {
 }
 
 
-export type ParsedTask = { "interval": number } & Omit<Task, "interval">;
 
 
 export default Scheduler;

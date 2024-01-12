@@ -44,6 +44,7 @@ module.exports = {
     "quotes": ["error", "double"],
     "space-in-parens": ["error", "never"],
     "spaced-comment": ["error", "always"],
+    "no-shadow": ["error", { "builtinGlobals": false}],
 
     "space-before-function-paren": ["error", {
         "anonymous": "never",
@@ -70,5 +71,10 @@ module.exports = {
     "@typescript-eslint/explicit-function-return-type": "error",
     "@typescript-eslint/explicit-module-boundary-types": "error",
     "@typescript-eslint/restrict-plus-operands": "error",
+    "@typescript-eslint/no-unsafe-assignment": "error",
+    "@typescript-eslint/no-unsafe-argument": "error",
+    "@typescript-eslint/no-unsafe-return": "error",
+    "@typescript-eslint/no-unsafe-member-access": "error",
+    "@typescript-eslint/no-unsafe-call": "error"
   }
 };

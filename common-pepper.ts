@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import Tasks from "./commands/main/say/tasks";
 import Channel from "./types/channel";
 import Client from "./types/client";
 import BotResponse from "./types/response";
@@ -120,6 +121,7 @@ export function onMessageHandler(
 
 client.on("connected", function(address: string, port: number): void {
   logger.info(`* Connected to ${address}:${port}`);
+  (new Tasks()).init();
 });
 
 

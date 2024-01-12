@@ -53,8 +53,23 @@ export default class BotResponse {
     if (!dupMsgChar) {
       throw new Error("Environment variable 'DUPMSG_CHAR' is not set.");
     }
+    const messageBypassCharCodes: unknown = JSON.parse(dupMsgChar);
+    if (!(messageBypassCharCodes instanceof Array)) {
+      throw new Error("Duplicate message character source has an invalid form");
+    }
 
-    const bypassChar = ` ${String.fromCodePoint(...JSON.parse(dupMsgChar))}`;
+    const validCharacter = ((lol: unknown[]): lol is Array<number> => {
+      lol.forEach((ele) => {
+        if (typeof ele !== "number" || isNaN(ele)) return false;
+        return true;
+      });
+      return true;
+    })(messageBypassCharCodes);
+
+    if (!validCharacter)
+      throw new Error("Duplicate message character code malformed");
+
+    const bypassChar = ` ${String.fromCodePoint(...messageBypassCharCodes)}`;
     return this.#response + bypassChar;
   }
 

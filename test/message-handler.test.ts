@@ -1,4 +1,5 @@
 import Channel from "../types/channel";
+import Response from "../types/response";
 
 import { onMessageHandler } from "../common-pepper";
 import * as executeCommand from "../commands";
@@ -58,10 +59,23 @@ describe("message handler", () => {
       onMessageHandler(target, context, request, self);
       expect(mockEnqueue.mock.calls.length).toBe(1);
 
-      const responseState = mockEnqueue.mock.calls[0][0];
-      expect(responseState.target).toBe(target);
-      expect(responseState.request).toBe(request);
-      expect(responseState.response).toBe(testResponse);
+      const mockEnqueueArgs: unknown = mockEnqueue.mock.calls[0];
+
+      if (Array.isArray(mockEnqueueArgs)) {
+        const responseState: unknown = mockEnqueueArgs[0];
+        expect(responseState).toBeInstanceOf(Response);
+        if (responseState instanceof Response) {
+          expect(responseState.target).toBe(target);
+          expect(responseState.request).toBe(request);
+          expect(responseState.response).toBe(testResponse);
+        }
+        else {
+          throw new Error("'responseState' must be of the type 'Response'.");
+        }
+      }
+      else {
+        throw new Error("Argument list must be an array.");
+      }
     });
 
 

@@ -1,303 +1,247 @@
 import fs from "fs";
-import { default as Scheduler, ParsedTask } from "./scheduler";
+import Database from "better-sqlite3";
+import { default as Scheduler } from "./scheduler";
 
 import path from "path";
-import { CommandAttributes, TaskAttribute } from "./types";
+import { CommandAttributes } from "./types";
+import hasProperty from "../../../utils/property-assert";
 
 import * as logger from "../../../utils/logger";
 
-
-/**
- * A singleton which handles a list of tasks in accordance to the schema of the
- * local JSON database and reflects the same on the task scheduler.
- */
+/** Create, modify and schedule tasks. */
 class Tasks {
-  static #databasePath = path.join(
-    __dirname,
-    `tasks-db${(process.env.NODE_ENV !== "test" ? "" : ".test")}.json`
+  #databaseDir = path.join(
+    process.cwd(),
+    "db",
   );
 
+  #databasePath = path.join(
+    this.#databaseDir,
+    `tasks${(process.env.NODE_ENV !== "test" ? "" : ".test")}.db`
+  );
 
-  static get databasePath(): string { return this.#databasePath; }
+  #database: ReturnType<typeof Database>;
 
-
-  /** Creates a new local database. */
-  static #createJSONDatabase(): void {
-    fs.writeFileSync(Tasks.#databasePath, JSON.stringify([{}], null, 4));
-  }
-
-
-  /** Checks if the local database exists. */
-  static #checkJSONDatabase(): void {
-    if (!fs.existsSync(Tasks.#databasePath)) {
-      const error = new Error();
-      error.message = "The local database doesn't exist or has been deleted: ";
-      error.message += Tasks.#databasePath;
-
-      throw error;
+  constructor() {
+    if (!fs.existsSync(this.#databaseDir)) {
+      fs.mkdirSync(this.#databaseDir);
     }
+
+    let newDatabase = false;
+    if (!fs.existsSync(this.#databasePath)) {
+      logger.info("Database does not exist, new one will be created.");
+      newDatabase = true;
+    }
+
+    const database = new Database(this.#databasePath);
+    if (newDatabase) {
+      try {
+        database
+          .prepare("CREATE TABLE tasks " +
+            "(name TEXT, channel TEXT, message TEXT, interval INTEGER);")
+          .run();
+      }
+      catch (error) {
+        let message = "";
+        if (error instanceof Database.SqliteError) {
+          message += "code: " + error.code + "\n";
+          message += "message: " + error.message + "\n";
+        }
+        message += "Cannot create 'tasks' table.";
+        console.error(message);
+      }
+    }
+
+    this.#database = database;
   }
 
 
-  /**
-   * Stores a list of tasks in a JSON format on a local JSON database.
-   * @param dbTasks Local JSON database compatible list of tasks.
-   */
-  static #storeTask(dbTasks: [DBTasks]): void {
-    Tasks.#checkJSONDatabase();
-    fs.writeFileSync(Tasks.#databasePath, JSON.stringify(dbTasks, null, 4));
-  }
+  get databasePath(): string { return this.#databasePath; }
+  get databaseDir(): string { return this.#databaseDir; }
+
+  get database(): ReturnType<typeof Database> { return this.#database; }
 
 
-  /** Initialize pre-exisiting task saved in the local JSON database. */
-  static init(): void {
-    try {
-      if (!fs.existsSync(Tasks.#databasePath)) Tasks.#createJSONDatabase();
+  /** Initialize pre-exisiting task saved in the database. */
+  init(): void {
+    const statement = this.#database.prepare("SELECT * FROM tasks;");
 
-      const tasks = Tasks.retrieveTasks();
-      const taskNames = Object.keys(tasks);
-      const taskList = Object.values(tasks);
-
-      const parsedTasks = [];
-      for (let i = 0; i < taskNames.length; i++) {
-        const task = taskList[i];
-        const parsedTask = {
-          ...task,
-          "interval": Number(task.interval),
-          taskName: taskNames[i]
-        };
-        parsedTasks.push(parsedTask);
+    const parsedTasks: DBTask[] = [];
+    for (const row of statement.iterate()) {
+      if (!TaskSchema(row)) {
+        throw new Error("The schema of the database is incompatible.");
       }
 
-      Scheduler.init(parsedTasks);
-    }
-    catch (err) { console.error(err); }
-  }
-
-
-  /**
-   * Retrieves parsed list of tasks from the local JSON database.
-   * @returns List of database object in which the key of each task corresponds
-   * to its task name.
-   */
-  static retrieveTasks(): DBTasks {
-    Tasks.#checkJSONDatabase();
-
-    const db = fs.readFileSync(Tasks.#databasePath);
-
-    const JSONfile = JSON.parse(db.toString());
-    const isValidJSON = Tasks.validateJSON(JSONfile);
-    if (!isValidJSON) {
-      const properJSONStructure = `
-      A valid JSON structure should be of the format:
-      \n[\n\t{\n\t\t"<task name>": {
-      \n\t\t\t"${CommandAttributes.interval}": <total_time_in_seconds>,
-      \n\t\t\t"${CommandAttributes.channel}": "<channel_name>",
-      \n\t\t\t"${CommandAttributes.message}": "<message>"
-      \n\t\t}\n\t\t"<another task name>": {\n\t\t\t...\n\t\t}...\n\t}\n]`;
-      logger.info(properJSONStructure);
-
-      const error = new Error();
-      error.message = "Invalid Task List. Clear the task list using ";
-      error.message += `'${process.env.PREFIX} clear task list'.`;
-      error.message += " Advanced: Either delete or manually format local DB.";
-
-      throw error;
+      parsedTasks.push(row);
     }
 
-    const [taskObject] = JSONfile;
-    return taskObject;
+    Scheduler.init(parsedTasks);
   }
 
 
   /**
    * Create a new task.
-   * @param task Task containing information on how bot response is invoked.
+   * @param task DBTask containing information on how bot response is invoked.
    */
-  static createTask(task: Task): string {
-    const tasks = Tasks.retrieveTasks();
+  createTask(task: DBTask): string {
+    const row: unknown = this.#database
+      .prepare("SELECT name FROM tasks WHERE name = ?")
+      .get(task.name);
 
-    if (tasks[task.taskName])
-      return `Task '${task.taskName}' already exists.`;
+    if (row) return `Task '${task.name}' already exists.`;
 
-    const validTask = getDBTask(task);
+    this.#database
+      .prepare(
+        "INSERT INTO tasks (name, channel, interval, message) " +
+        "VALUES (?, ?, ?, ?)",
+      ).run(task.name, task.channel, task.interval, task.message);
 
-    tasks[task.taskName] = validTask;
-    Tasks.#storeTask([tasks]);
+    Scheduler.addTask({
+      name: task.name,
+      channel: task.channel,
+      interval: Number(task.interval),
+      message: task.message
+    });
 
-    const parsedTask: ParsedTask = {
-      ...task, "interval": Number(task.interval)
-    };
-    Scheduler.addTask(parsedTask);
-
-    return `Task ${task.taskName} activated on channel ${task.channel}.`;
+    return `Task ${task.name} activated on channel ${task.channel}.`;
   }
 
 
   /**
-   * Updates an existing task from the task list.
-   * @param taskName The name of the task that needs to be updated.
+   * Updates an existing task.
+   * @param name The name of the task that needs to be updated.
    * @param task The new modified version of the task that is to be replaced
    * with old task.
    * @returns Status of the task update.
    */
-  static updateTask(taskName: string, task: Partial<Task>): string {
-    if (Object.keys(task).length === 0)
-      throw new Error("Specify an attribute to be modified.");
+  updateTask(name: string, task: AtLeastOne<DBTask>): string {
+    const row: unknown = this.#database
+      .prepare(
+        "SELECT name, channel, message, interval FROM tasks WHERE name = ?"
+      )
+      .get(name);
 
-    const tasks = Tasks.retrieveTasks();
-
-    if (!tasks[taskName]) {
-      return `The task '${taskName}' does not exists.`;
+    if (!row) {
+      return `The task '${name}' does not exists.`;
     }
 
-    const oldTask = tasks[taskName];
-
-    const toModify: Partial<DBTask> = {};
-    if (task.interval) toModify.interval = task.interval;
-    if (task.channel) toModify.channel = task.channel;
-    if (task.message) toModify.message = task.message;
-
-    const modifiedTask = { ...oldTask, ...toModify };
-
-    let modifiedTaskName = task.taskName;
-    if (!modifiedTaskName) {
-      modifiedTaskName = taskName;
-    }
-    else delete tasks[taskName]; // Deletes old task name
-
-    Scheduler.removeTask(taskName);
-
-    tasks[modifiedTaskName] = modifiedTask;
-    Tasks.#storeTask([tasks]);
-
-    const parsedTask: ParsedTask = {
-      ...modifiedTask,
-      "interval": Number(modifiedTask.interval),
-      taskName: modifiedTaskName
-    };
-    Scheduler.addTask(parsedTask);
-
-    return `Task ${taskName} successfully modified.`;
-  }
-
-
-  /**
-   * Deletes a task from the task list.
-   * @param taskName The name of the task that is to be deleted.
-   */
-  static deleteTask(taskName: string): string {
-    const tasks = Tasks.retrieveTasks();
-
-    if (!tasks[taskName]) {
-      return `The task '${taskName}' does not exists.`;
+    if (!TaskSchema(row)) {
+      throw new Error("The schema of the database is incompatible.");
     }
 
-    delete tasks[taskName];
 
-    Tasks.#storeTask([tasks]);
+    let sql = "UPDATE tasks SET ";
+    const values = [] as unknown as [string | number];
 
-    Scheduler.removeTask(taskName);
-
-    return `Task ${taskName} successfully removed.`;
-  }
-
-
-  /** Clears the task list. */
-  static clearTasks(): void {
-    const tasks = Tasks.retrieveTasks();
-    const taskNames = Object.keys(tasks);
-
-    Tasks.#checkJSONDatabase(); Tasks.#storeTask([{}]);
-
-    taskNames.forEach(taskName => {
-      Scheduler.removeTask(taskName);
+    const taskKeyValues = Object.entries(task);
+    taskKeyValues.forEach((keyValue, index) => {
+      if (index === taskKeyValues.length - 1) sql += keyValue[0] + " = ? ";
+      else sql += keyValue[0] + " = ?, ";
+      values.push(keyValue[1]);
     });
+    sql += " WHERE name = '" + name + "'";
+
+
+    this.#database.prepare(sql).run(values);
+
+    Scheduler.removeTask(name);
+
+    Scheduler.addTask({ ...task, ...row });
+
+    return `Task ${name} successfully modified.`;
   }
 
 
   /**
-   * Validates local JSON database for any invalid structures.
-   * @example An example of a both a valid JSON parsing database along with
-   * proper structure:
-   * ```js
-  * [
-   * {
-      *         "<task_name>": {
-   *             "interval": "<total_time_in_seconds>",
-   *             "channel": "<channel_name>",
-   *             "message": "<message>"
-   *         }...
-   *     }
-   * ]
-  * ```
-   * @param db
-   * - Parsed JSON file.
-   * - Set the value to be an empty string - `""`, if it's not to be validated.
+   * Deletes a task from the database and removes it from the scheduler.
+   * @param name The name of the task that is to be deleted.
    */
-  static validateJSON(db: unknown): db is DBSchema {
-    if (!Array.isArray(db)) return false;
-    if (db.length !== 1) return false;
-    if (typeof db[0] !== "object" || db[0] === null || Array.isArray(db[0]))
-      return false;
+  deleteTask(name: string): string {
+    const row: Database.RunResult = this.#database
+      .prepare("DELETE FROM tasks WHERE name = ?")
+      .run(name);
 
-    const taskList = Object.values(db[0]);
-    if (taskList.length > 0) {
-      for (let i = 0; i < taskList.length; i++) {
-        const task = taskList[i];
-        if (task === null) return false;
-        if (typeof task !== "object") return false;
-        const attributes = Object.keys(task);
-        const validTaskAttributes: Array<TaskAttribute> = [
-          "channel", "interval", "message"
-        ];
-        const validStringTaskAttributes: Array<string> = validTaskAttributes;
 
-        if (attributes.length !== validTaskAttributes.length) return false;
-        for (let i = 0; i < attributes.length; i++) {
-          const attribute = attributes[i];
-
-          const isValidAttribute = validStringTaskAttributes
-            .includes(attribute);
-
-          if (!isValidAttribute) return false;
-        }
-      }
+    if (!row.changes) {
+      return `The task '${name}' does not exists.`;
     }
 
-    return true;
+    Scheduler.removeTask(name);
+
+    return `Task ${name} successfully removed.`;
+  }
+
+
+  /** Clears the tasks from scheduler and the database */
+  clearTasks(): string {
+    const deleteTasks = this.#database.prepare("DELETE FROM tasks");
+
+    const statement = this.#database.prepare("SELECT * FROM tasks;");
+
+    let rowCount = 0;
+    for (const row of statement.iterate()) {
+      if (!TaskSchema(row)) {
+        throw new Error("The schema of the database is incompatible.");
+      }
+
+      if (!RowName(row)) throw new Error();
+      Scheduler.removeTask(row.name);
+      rowCount++;
+    }
+
+    if (deleteTasks.run().changes !== rowCount) {
+      console.error(
+        "FATAL: Number of tasks deleted does not match with total tasks"
+      );
+      process.abort();
+    }
+
+    if (rowCount === 0) return "Tasks are already cleared.";
+
+    return "Tasks are cleared.";
   }
 }
-
-Tasks.init();
 
 
 /**
- * Convert to a valid local JSON database task.
- * @param task Record of task attributes with its corresponding string values.
+ * Validates a task object returned by database as object with expected types.
+ * @param row task object.
  */
-export function getDBTask(task: Task): DBTask {
-  return {
-    "channel": task.channel,
-    "interval": task.interval,
-    "message": task.message,
-  };
+export function TaskSchema(row: unknown): row is DBTask {
+  if (row === null) return false;
+  if (typeof row !== "object") return false;
+
+  if (!(hasProperty(row, "name"))) return false;
+  if (!(hasProperty(row, "message"))) return false;
+  if (!(hasProperty(row, "channel"))) return false;
+  if (!(hasProperty(row, "interval"))) return false;
+  if (typeof row.name!== "string") return false;
+  if (typeof row.message !== "string") return false;
+  if (typeof row.channel !== "string") return false;
+  if (typeof row.interval !== "number") return false;
+
+
+  return true;
 }
 
 
+function RowName(row: unknown): row is {name: string} {
+  return row !== null &&
+    typeof row === "object" &&
+    hasProperty(row, "name") && typeof row.name === "string";
+}
+
+
+/** Schema of a task received from the user. */
 export type Task = Record<keyof typeof CommandAttributes, string>;
 
+/** Type compatible task with the database schema. */
+export type DBTask = Omit<Task, "interval" | "taskName">
+  & {interval: number, name: string};
 
-/** Schema of a task in the local JSON database. */
-export type DBTask = Omit<Task, "taskName">;
-
-
-/** Schema of the list of tasks in the local JSON database. */
-export type DBTasks = Record<string, DBTask>;
-
-
-/** Schema of the local JSON database. */
-type DBSchema = [DBTasks];
-
+/** Atleast one of the task parameter should be defined. */
+export type AtLeastOne<T, U = { [K in keyof T]: Pick<T, K> }> =
+  Partial<T> & U[keyof U];
 
 export default Tasks;
+

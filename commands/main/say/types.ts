@@ -15,7 +15,7 @@ export const CommandAttributes = {
   message: "say",
   interval: "every",
   channel: "on",
-  taskName: "named",
+  name: "named",
 } as const;
 
 
@@ -23,7 +23,7 @@ export type CommandAttribute = keyof typeof CommandAttributes;
 export type CommandAttributeValue = typeof CommandAttributes[CommandAttribute];
 
 
-export type TaskAttribute = Exclude<CommandAttribute, "taskName">;
+export type TaskAttribute = Exclude<CommandAttribute, "name">;
 
 
 const IntervalTaskAttribute = { interval: CommandAttributes.interval } as const;
@@ -34,7 +34,7 @@ const ChannelTaskAttribute = { channel: CommandAttributes.channel } as const;
 type ChannelAttribute = keyof typeof ChannelTaskAttribute;
 type ChannelAttributeValue = typeof ChannelTaskAttribute[ChannelAttribute];
 
-const TaskNameTaskAttribute = { taskName: CommandAttributes.taskName } as const;
+const TaskNameTaskAttribute = { taskName: CommandAttributes.name } as const;
 type TaskNameAttribute = keyof typeof TaskNameTaskAttribute;
 type TaskNameAttributeValue = typeof TaskNameTaskAttribute[TaskNameAttribute];
 

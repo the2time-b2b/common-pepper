@@ -1,8 +1,5 @@
 import { SimpleIntervalJob, Task, ToadScheduler } from "toad-scheduler";
-import {
-  default as Scheduler,
-  ParsedTask
-} from "../../../../commands/main/say/scheduler";
+import { default as Scheduler } from "../../../../commands/main/say/scheduler";
 import { DBTask } from "../../../../commands/main/say/tasks";
 import Client from "../../../../types/client";
 import Channel from "../../../../types/channel";
@@ -30,19 +27,14 @@ describe("Scheduler", () => {
 
       clientConnectSpy.mockResolvedValueOnce(["", 0]);
 
-      const baseTaskAttributes: DBTask = {
-        channel: "test_channel1",
-        interval: "12345",
-        message: "hello :D"
-      };
-
-      const parsedTasks: Array<ParsedTask> = [];
+      const parsedTasks: Array<DBTask> = [];
       const totalTasks = 10;
       for (let i = 0; i < totalTasks; i++) {
         parsedTasks.push({
-          ...baseTaskAttributes,
-          interval: Number(baseTaskAttributes.interval),
-          taskName: `task${i}`
+          channel: "test_channel1",
+          interval: 12345,
+          message: "hello :D",
+          name: `task${i}`
         });
       }
 
@@ -88,8 +80,8 @@ describe("Scheduler", () => {
       it("when the target channel is already initalized", () => {
         mockCheckChannel.mockReturnValue(true);
 
-        const task: ParsedTask = {
-          taskName: "task",
+        const task: DBTask = {
+          name: "task",
           channel: "channel",
           message: "message",
           interval: 60
@@ -104,7 +96,7 @@ describe("Scheduler", () => {
         expect(mockSimpleIntervalJob).toHaveBeenCalledWith(
           { seconds: task.interval },
           expect.any(Task),
-          task.taskName
+          task.name
         );
         expect(addSimpleIntervalJob)
           .toBeCalledWith(mockSimpleIntervalJob.mock.instances[0]);
@@ -114,8 +106,8 @@ describe("Scheduler", () => {
       it("and creating a channel instance if it is not initalized", () => {
         mockCheckChannel.mockReturnValue(false);
 
-        const task: ParsedTask = {
-          taskName: "task",
+        const task: DBTask= {
+          name: "task",
           channel: "channel",
           message: "message",
           interval: 60

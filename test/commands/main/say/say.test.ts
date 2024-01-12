@@ -1,4 +1,4 @@
-import Tasks, { Task } from "../../../../commands/main/say/tasks";
+import Tasks, { AtLeastOne, DBTask } from "../../../../commands/main/say/tasks";
 import { CommandAttributes } from "../../../../commands/main/say/types";
 
 import say from "../../../../commands/main/say";
@@ -45,12 +45,14 @@ describe("say command", () => {
 
 
   describe("is executed successfully using a valid command", () => {
+    const createTaskSpy = jest.spyOn(Tasks.prototype, "createTask");
+
     describe("to create a new task", () => {
       test("where the task is successfully created", () => {
         const dummyInterval = 0;
         const dummyStatus = "dummy status";
 
-        (Tasks.createTask as jest.Mock).mockReturnValue(dummyStatus);
+        createTaskSpy.mockReturnValue(dummyStatus);
         (convertToSeconds as jest.Mock).mockReturnValue(dummyInterval);
 
         const request = [
@@ -65,14 +67,15 @@ describe("say command", () => {
         ];
         const newTask = {
           message: "test message",
-          interval: dummyInterval.toString(),
+          interval: dummyInterval,
           channel: "justintv",
-          taskName: "task-name"
+          name: "task-name"
         };
 
         const status = say.exec({}, request);
 
-        expect(Tasks.createTask).toBeCalledWith(newTask);
+        expect(createTaskSpy).toBeCalledTimes(1);
+        expect(createTaskSpy).toBeCalledWith(newTask);
         expect(status).toBe(dummyStatus);
       });
     });
@@ -83,7 +86,7 @@ describe("say command", () => {
         const request = ["clear", "task", "list"];
         const status = say.exec({}, request);
 
-        expect(Tasks.clearTasks).toBeCalled();
+        expect(createTaskSpy).toBeCalledTimes(1);
         expect(status).toBe("The task list has been wiped clean.");
       });
     });
@@ -109,36 +112,52 @@ describe("say command", () => {
 
           describe("for both", () => {
             test("modify deletes, where it deletes the task", () => {
-              const dummyStatus = "dummy status";
               const deleteRequests = [
                 ["task-name", "delete"],
                 ["task-name", "remove"]
               ];
 
               deleteRequests.forEach(request => {
-                (Tasks.deleteTask as jest.Mock)
-                  .mockReturnValueOnce(dummyStatus);
+                const deleteTaskSpy = jest.spyOn(Tasks.prototype, "deleteTask");
+                deleteTaskSpy.mockReturnValueOnce(dummyStatus);
 
                 const status = say.modifyTask(request);
 
-                expect(Tasks.deleteTask).toBeCalledWith("task-name");
+                expect(deleteTaskSpy).toBeCalledWith("task-name");
                 expect(status).toBe(dummyStatus);
               });
             });
 
 
             test("modify updates, where it updates the task", () => {
-              const dummyStatus = "dummy status";
-              (Tasks.updateTask as jest.Mock).mockReturnValueOnce(dummyStatus);
+              const updateTaskSpy = jest.spyOn(Tasks.prototype, "updateTask");
+              updateTaskSpy.mockReturnValueOnce(dummyStatus);
               (validateModifyAttribute as unknown as jest.Mock)
                 .mockReturnValueOnce(true);
 
-              const request = ["task-name", "dummy", "request"];
-              const status = say.modifyTask(request);
-              const modifiedTask: Partial<Task> = {};
+              const request = [
+                "task-name",
+                CommandAttributes.channel,
+                "request"
+              ];
 
-              expect(Tasks.updateTask)
-                .toBeCalledWith("task-name", modifiedTask);
+              type SwappedObject<T extends Record<string, string>> = {
+                [K in keyof T as T[K]]: K;
+              };
+
+              const attribute: SwappedObject<typeof CommandAttributes> = {
+                every: "interval",
+                named: "name",
+                on: "channel",
+                say: "message"
+              };
+
+              const modifiedTask: AtLeastOne<DBTask> = {
+                [attribute[CommandAttributes.channel]]: request[2]
+              };
+              const status = say.modifyTask(request);
+
+              expect(updateTaskSpy).toBeCalledWith("task-name", modifiedTask);
               expect(status).toBe(dummyStatus);
             });
           });
@@ -232,13 +251,13 @@ describe("say command", () => {
     const attributeLength = Object.values(CommandAttributes).length * 2;
     // Task message argument does not have a key in a create task request.
     const requestLength = attributeLength - 1;
-    const request = Array(requestLength).fill("dummy");
+    const request = Array<string>(requestLength).fill("dummy");
 
 
     describe("when attribute key-value length is less than required", () => {
       it("returns the command usage", () => {
         for (let i = 1; i < requestLength; i++) {
-          const status = say.exec({}, Array(i).fill("dummy"));
+          const status = say.exec({}, Array<string>(i).fill("dummy"));
           expect(status).toBe(description.usage);
         }
       });

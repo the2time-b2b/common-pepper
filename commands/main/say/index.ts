@@ -1,6 +1,6 @@
 import { Say, CommandAttributes } from "./types";
 import * as service from "./service";
-import { default as Tasks, Task } from "./tasks";
+import { default as Tasks, DBTask, AtLeastOne } from "./tasks";
 
 import description from "./description";
 
@@ -9,8 +9,9 @@ const say: Say = {
   exec(_context, request) {
     if (request.length === 0) return description.usage;
 
+    const tasks = new Tasks();
     if (request.join(" ") === "clear task list") {
-      Tasks.clearTasks();
+      tasks.clearTasks();
       return "The task list has been wiped clean.";
     }
 
@@ -52,14 +53,14 @@ const say: Say = {
     const [seconds, minutes, hours] = parsedInterval;
     const intervalInSeconds = service.convertToSeconds(seconds, minutes, hours);
 
-    const newTask: Task = {
-      "taskName": taskName,
-      "interval": intervalInSeconds.toString(),
+    const newTask: DBTask = {
+      "name": taskName,
+      "interval": intervalInSeconds,
       "channel": channel,
       "message": message
     };
 
-    return Tasks.createTask(newTask);
+    return tasks.createTask(newTask);
   },
 
 
@@ -67,8 +68,9 @@ const say: Say = {
     const [taskName] = request.splice(0, 1);
     if (request.length === 0) return description.modify;
 
+    const tasks = new Tasks();
     if (request.length === 1 && ["remove", "delete"].includes(request[0])) {
-      return Tasks.deleteTask(taskName);
+      return tasks.deleteTask(taskName);
     }
 
     const [attribute] = request.splice(0, 1);
@@ -78,16 +80,15 @@ const say: Say = {
 
     const modifiedValue = request.join(" ").toLowerCase();
 
-    const modifiedTask: Partial<Task> = {};
+    let modifiedTask: AtLeastOne<DBTask>;
+    let intervalInSeconds: number | null = null;
 
     if (attribute === CommandAttributes.message) {
       if (request.length === 0) return description.message;
 
-      modifiedTask.message = modifiedValue;
+      modifiedTask = { message: modifiedValue };
     }
-
-    let intervalInSeconds: number | null = null;
-    if (attribute === CommandAttributes.interval) {
+    else if (attribute === CommandAttributes.interval) {
       if (!service.checkInterval(modifiedValue)) return description.interval;
 
       const parsedInterval = service.parseInterval(modifiedValue);
@@ -97,21 +98,22 @@ const say: Say = {
       const [seconds, minutes, hours] = parsedInterval;
       intervalInSeconds = service.convertToSeconds(seconds, minutes, hours);
 
-      modifiedTask.interval = intervalInSeconds.toString();
+      modifiedTask = { interval: intervalInSeconds };
     }
-
-    if (attribute === CommandAttributes.channel) {
+    else if (attribute === CommandAttributes.channel) {
       if (!service.checkChannelName(modifiedValue))
         return description.channel;
 
-      modifiedTask.channel = modifiedValue;
+      modifiedTask = { channel: modifiedValue };
     }
-
-    if (attribute === CommandAttributes.taskName) {
+    else if (attribute === CommandAttributes.name) {
       if (!service.checkTaskName(modifiedValue))
         return description["task-name"];
 
-      modifiedTask.taskName = modifiedValue;
+      modifiedTask = { name: modifiedValue };
+    }
+    else {
+      throw new Error("No attributes specified to modify.");
     }
 
     /**
@@ -119,7 +121,7 @@ const say: Say = {
      *  But updateTask is extensible for more than one attribute.
      *  Note: modifiedTask is a 'Partial' of type 'Task'.
      */
-    return Tasks.updateTask(taskName, modifiedTask);
+    return tasks.updateTask(taskName, modifiedTask);
   }
 };
 

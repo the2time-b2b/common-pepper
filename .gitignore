@@ -14,4 +14,5 @@ coverage
 .vscode
 
 # local db.
-tasks-db*.json
+db/
+

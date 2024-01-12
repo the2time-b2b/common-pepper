@@ -24,7 +24,7 @@ export function checkAttributeStructure(
 
   if (attributes[0] !== CommandAttributes.interval) return false;
   if (attributes[2] !== CommandAttributes.channel) return false;
-  if (attributes[4] !== CommandAttributes.taskName) return false;
+  if (attributes[4] !== CommandAttributes.name) return false;
 
   return true;
 }
@@ -38,8 +38,10 @@ export function validateModifyAttribute(
   attribute: string
 ): attribute is CommandAttributeValue {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const commandAttributeValues = Object.values(CommandAttributes) as any;
-  if ((commandAttributeValues).includes(attribute)) return true;
+  const commandAttributeValues = Object.values(CommandAttributes);
+  for (const commandAttribute of commandAttributeValues) {
+    if (commandAttribute === attribute) return true;
+  }
 
   return false;
 }

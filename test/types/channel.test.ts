@@ -5,6 +5,7 @@ import {
 } from "../../types/channel";
 
 import data from "./test-sets/channel";
+import hasProperty from "../../utils/property-assert";
 
 
 jest.mock("../../types/queue");
@@ -64,7 +65,6 @@ describe("when creating a channel", () => {
 
     test("but is rejected", () => {
       const rejectMessage = "connection rejected.";
-      const mockConnect = jest.spyOn(Client.prototype, "connect");
       mockConnect.mockRejectedValue(rejectMessage);
 
       const username = "test_user";
@@ -301,15 +301,26 @@ describe("the response queue manager is invoked", () => {
     await responseManager(channel, client, 30, 3);
 
     const messageStateReturns = getMessageStateSpy.mock.results;
-    const lastMessageState: MessageState =
-      messageStateReturns[messageStateReturns.length - 1].value;
+    const lastMessageState: unknown = messageStateReturns[0].value;
+
     expect(sendSpy).toBeCalled();
     expect(getMessageStateSpy).toBeCalledTimes(1);
     expect(loggerSpy).toBeCalledWith("\n* Details:", JSON.stringify(
       { target, response }
     ));
-    expect(lastMessageState.recentMessage).toBe(response);
-    expect(lastMessageState.messageLastSent).toBe(Date.now());
+
+    if (
+      lastMessageState &&
+      typeof lastMessageState === "object" &&
+      hasProperty(lastMessageState, "recentMessage") &&
+      hasProperty(lastMessageState, "messageLastSent")
+    ) {
+      expect(lastMessageState.recentMessage).toBe(response);
+      expect(lastMessageState.messageLastSent).toBe(Date.now());
+    }
+    else {
+      throw new Error("'lastMessageState' should be of a type 'MessageState'");
+    }
     expect(queueRetrieveSpy).toBeCalledTimes(1);
     expect(dequeueSpy).toBeCalledTimes(1);
 
