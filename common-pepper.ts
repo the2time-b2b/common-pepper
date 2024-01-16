@@ -110,7 +110,7 @@ export function onMessageHandler(
   const splitModifiedRequest = request.trim().replace(/\s\s+/g, " ").split(" ");
   const modifiedRequest = splitModifiedRequest.join(" ");
 
-  const botResponse = executeCommand(context, splitModifiedRequest);
+  const botResponse = executeCommand(context, splitModifiedRequest, target);
 
   const responseState = new BotResponse(modifiedRequest, channel, botResponse);
 

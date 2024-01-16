@@ -72,7 +72,7 @@ describe("say command", () => {
           name: "task-name"
         };
 
-        const status = say.exec({}, request);
+        const status = say.exec({}, request, "test_channel");
 
         expect(createTaskSpy).toBeCalledTimes(1);
         expect(createTaskSpy).toBeCalledWith(newTask);
@@ -84,7 +84,7 @@ describe("say command", () => {
     describe("to clear a task list", () => {
       test("where status is returned that the task list were removed", () => {
         const request = ["clear", "task", "list"];
-        const status = say.exec({}, request);
+        const status = say.exec({}, request, "test_channel");
 
         expect(createTaskSpy).toBeCalledTimes(1);
         expect(status).toBe("The task list has been wiped clean.");
@@ -103,7 +103,7 @@ describe("say command", () => {
 
             const request = ["modify", "test", "task", "attribute"];
             const modifyRequest = request.slice(1);
-            const status = say.exec({}, request);
+            const status = say.exec({}, request, "test_channel");
 
             expect(modifyTaskSpy).toBeCalledWith(modifyRequest);
             expect(status).toBe(dummyStatus);
@@ -239,7 +239,7 @@ describe("say command", () => {
   describe("has a request that is improperly formatted", () => {
     describe("when no attribute is supplied", () => {
       it("returns the command usage", () => {
-        const status = say.exec({}, []);
+        const status = say.exec({}, [], "test_channel");
 
         expect(status).toBe(description.usage);
       });
@@ -252,12 +252,13 @@ describe("say command", () => {
     // Task message argument does not have a key in a create task request.
     const requestLength = attributeLength - 1;
     const request = Array<string>(requestLength).fill("dummy");
+    const channel = "test_channel";
 
 
     describe("when attribute key-value length is less than required", () => {
       it("returns the command usage", () => {
         for (let i = 1; i < requestLength; i++) {
-          const status = say.exec({}, Array<string>(i).fill("dummy"));
+          const status = say.exec({}, Array<string>(i).fill("dummy"), channel);
           expect(status).toBe(description.usage);
         }
       });
@@ -269,7 +270,7 @@ describe("say command", () => {
         (checkAttributeStructure as unknown as jest.Mock)
           .mockReturnValueOnce(false);
 
-        const status = say.exec({}, [...request]);
+        const status = say.exec({}, [...request], channel);
         expect(status).toBe(description.usage);
       });
     });
@@ -279,7 +280,7 @@ describe("say command", () => {
       it("returns the way in which interval is to be structured", () => {
         (checkInterval as unknown as jest.Mock).mockReturnValueOnce(false);
 
-        const status = say.exec({}, [...request]);
+        const status = say.exec({}, [...request], channel);
         expect(status).toBe(description.interval);
       });
     });
@@ -289,7 +290,7 @@ describe("say command", () => {
       it("returns information on rules of a valid username", () => {
         (checkChannelName as jest.Mock).mockReturnValueOnce(false);
 
-        const status = say.exec({}, [...request]);
+        const status = say.exec({}, [...request], channel);
         expect(status).toBe(description.channel);
       });
     });
@@ -299,7 +300,7 @@ describe("say command", () => {
       it("returns information on rules of a valid task name", () => {
         (checkTaskName as jest.Mock).mockReturnValueOnce(false);
 
-        const status = say.exec({}, [...request]);
+        const status = say.exec({}, [...request], channel);
         expect(status).toBe(description["task-name"]);
       });
     });
@@ -309,7 +310,7 @@ describe("say command", () => {
       it("returns information on rules of a valid interval", () => {
         (validateInterval as jest.Mock).mockReturnValueOnce(false);
 
-        const status = say.exec({}, [...request]);
+        const status = say.exec({}, [...request], channel);
         expect(status).toBe(description.interval);
       });
     });

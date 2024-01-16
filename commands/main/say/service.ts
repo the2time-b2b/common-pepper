@@ -1,5 +1,5 @@
 import {
-  CreateTaskStructure,
+  TaskStructure,
   CommandAttributes,
   CommandAttributeValue,
   RawInterval,
@@ -15,15 +15,16 @@ import {
  */
 export function checkAttributeStructure(
   attributes: Array<string>
-): attributes is CreateTaskStructure {
-  const createTaskKeys = Object.keys(CommandAttributes).filter(attr => {
-    return attr !== "message";
-  });
-  const createTaskKeyValueLength = createTaskKeys.length * 2;
-  if (attributes.length !== createTaskKeyValueLength) return false;
+): attributes is TaskStructure {
+  const createTaskKeyValueLength = [4, 6];
+  if (!createTaskKeyValueLength.includes((attributes.length))) return false;
 
   if (attributes[0] !== CommandAttributes.interval) return false;
-  if (attributes[2] !== CommandAttributes.channel) return false;
+  if (attributes[2] !== CommandAttributes.channel) {
+    if (attributes[2] !== CommandAttributes.name) return false;
+    if (attributes[4] || attributes[5]) return false;
+    return true;
+  }
   if (attributes[4] !== CommandAttributes.name) return false;
 
   return true;

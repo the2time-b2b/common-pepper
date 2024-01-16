@@ -40,11 +40,17 @@ type TaskNameAttributeValue = typeof TaskNameTaskAttribute[TaskNameAttribute];
 
 
 /** Ordered attribute structure used to create a task. */
-export type CreateTaskStructure = [
+export type TaskStructure = [
   intervalAttribute: IntervalAttributeValue,
   interval: string,
   channelAttribute: ChannelAttributeValue,
   channel: string,
+  taskNameAttribute: TaskNameAttributeValue,
+  taskName: string,
+] |
+[
+  intervalAttribute: IntervalAttributeValue,
+  interval: string,
   taskNameAttribute: TaskNameAttributeValue,
   taskName: string,
 ];

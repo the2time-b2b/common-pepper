@@ -27,12 +27,13 @@ describe("when a command is sent and the handler is invoked", () => {
   describe("command is successfully executed", () => {
     const context = { ["display-name"]: "justintv" };
     const request = ["!command1", "test", "command"];
+    const channel = "testChannel";
     let result: string;
 
     test("the prefixed command is sliced from the request", () => {
-      result = execute(context, request);
+      result = execute(context, request, channel);
       expect(mockedCommandList.command1.exec)
-        .toHaveBeenCalledWith(context, ["test", "command"]);
+        .toHaveBeenCalledWith(context, ["test", "command"], channel);
     });
     test("and result is returned", () => {
       expect(result).toBe("command1 invoked");

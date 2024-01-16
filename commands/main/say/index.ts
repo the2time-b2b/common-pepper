@@ -6,8 +6,10 @@ import description from "./description";
 
 
 const say: Say = {
-  exec(_context, request) {
+  exec(_context, request, channel) {
+    if (!channel) throw Error("request origin should be speicifed.");
     if (request.length === 0) return description.usage;
+
 
     const tasks = new Tasks();
     if (request.join(" ") === "clear task list") {
@@ -30,18 +32,30 @@ const say: Say = {
     const attributesLength = taskAttributesLength - 2;
     const attributes = request.splice(request.length - attributesLength);
 
+
     if (!service.checkAttributeStructure(attributes)) return description.usage;
 
     const message = request.join(" ");
     const interval = attributes[1];
-    const channel = attributes[3].toLowerCase();
-    const taskName = attributes[5].toLowerCase();
+    let taskName: string;
+    let targetChannel: string | undefined;
+
+    if (attributes[5]) {
+      targetChannel = attributes[3].toLowerCase();
+      taskName = attributes[5].toLowerCase();
+    }
+    else {
+      taskName = attributes[3].toLowerCase();
+    }
 
     const checkInterval = service.checkInterval(interval);
     if (!checkInterval) return description.interval;
 
-    const checkChannelName = service.checkChannelName(channel);
-    if (!checkChannelName) return description.channel;
+
+    if (targetChannel) {
+      const checkChannelName = service.checkChannelName(targetChannel);
+      if (!checkChannelName) return description.channel;
+    }
 
     const checkTaskName = service.checkTaskName(taskName);
     if (!checkTaskName) return description["task-name"];
@@ -56,7 +70,7 @@ const say: Say = {
     const newTask: DBTask = {
       "name": taskName,
       "interval": intervalInSeconds,
-      "channel": channel,
+      "channel": (targetChannel) ? targetChannel : channel,
       "message": message
     };
 
