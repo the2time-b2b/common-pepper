@@ -40,11 +40,17 @@ type TaskNameAttributeValue = typeof TaskNameTaskAttribute[TaskNameAttribute];
 
 
 /** Ordered attribute structure used to create a task. */
-export type CreateTaskStructure = [
+export type TaskStructure = [
   intervalAttribute: IntervalAttributeValue,
   interval: string,
   channelAttribute: ChannelAttributeValue,
   channel: string,
+  taskNameAttribute: TaskNameAttributeValue,
+  taskName: string,
+] |
+[
+  intervalAttribute: IntervalAttributeValue,
+  interval: string,
   taskNameAttribute: TaskNameAttributeValue,
   taskName: string,
 ];
@@ -60,9 +66,4 @@ type RawHours = `${number}:${number}:${number}`;
  */
 export type RawInterval = RawSeconds | RawMinutes | RawHours;
 
-
-type ParsedSeconds = [seconds: number, minutes: null, hours: null];
-type ParsedMinutes = [seconds: number, minutes: number, hours: null];
-type ParsesHours = [seconds: number, minutes: number, hours: number];
-
-export type ParsedInterval = ParsedSeconds | ParsedMinutes | ParsesHours;
+export type ParsedInterval = [hours: number, minutes: number, seconds: number];

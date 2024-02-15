@@ -15,6 +15,7 @@ describe("command attribute structure is properly validated", () => {
   test("valid attribute keys returns true", () => {
     const validAttributeKeys = [
       ["every", "1:30:15", "on", "justintv", "named", "test_task"],
+      ["every", "1:30:15", "named", "test_task"],
       ["every", "", "on", "", "named", ""],
       ["every", "::", "on", "justintv", "named", "test_task"],
       ["every", "1:30:15", "on", "123", "named", "test_task"],
@@ -39,7 +40,6 @@ describe("command attribute structure is properly validated", () => {
       ["every", "1:30:15", "named", "test_task", "on", "justintv"],
       ["named", "test_task", "on", "justintv", "every", "1:30:15"],
       ["on", "justintv", "named", "test_task"],
-      ["every", "1:30:15", "named", "test_task"],
       ["every", "1:30:15", "on", "justintv"],
       ["every", "time", "1:30:15", "on", "justintv", "named", "test_task"],
       ["in", "every", "1:30:15", "on", "justintv", "named", "test_task"],

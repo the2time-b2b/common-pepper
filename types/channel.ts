@@ -27,7 +27,7 @@ class Channel {
   #bypassInterval = 30;
 
   /** Interval in which the response queue is polled. */
-  #pollingInterval = 5000;
+  #pollingInterval = 1000;
 
   /** Current message state of a channel. */
   #messageState: MessageState = {
@@ -58,6 +58,10 @@ class Channel {
     resendLimit?: number,
     pollingInterval?: number
   ) {
+    if (client.readyState() !== "OPEN") {
+      client.connect();
+    }
+
     const isValidUsername = username.match(/^[a-zA-Z0-9_]{4,25}$/);
     if (!isValidUsername) throw new Error(
       "Invalid username: '" + username + "'. " +
@@ -290,6 +294,7 @@ export async function responseManager(
   const messageState = channel.getMessageState();
 
   let response;
+  
   try {
     response = await client.send(responseState, messageState, bypassInterval);
 
@@ -309,6 +314,8 @@ export async function responseManager(
     }
   }
   catch (err: unknown) {
+    console.log(err);
+    
     if (!(err instanceof Error)) throw err;
     if (err.name !== "sendIntervalError") console.error(err);
   }

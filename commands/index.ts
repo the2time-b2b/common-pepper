@@ -6,11 +6,16 @@ import Command from "./command";
 
 /**
  * Execute a command requested by the end user.
+ * @param channel The channel where the command was invoked.
  * @param context Meta data of the user who invoked the command.
  * @param request An array of split user command request for further processing.
  * @returns Status of the command.
  */
-function execute(context: ChatUserstate, request: Array<string>): string {
+function execute(
+  context: ChatUserstate,
+  request: Array<string>,
+  channel?: string
+): string {
   if (!process.env.PREFIX) {
     throw new Error("Environment variable 'PREFIX' is not set.");
   }
@@ -28,7 +33,7 @@ function execute(context: ChatUserstate, request: Array<string>): string {
   if (Object.keys(commandList).includes(requestedCommand)) {
     const command = commands[requestedCommand];
 
-    return command.exec(context, request.splice(1));
+    return command.exec(context, request.splice(1), channel);
   }
 
 

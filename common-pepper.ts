@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import Tasks from "./commands/main/say/tasks";
+import Task from "./commands/bot/task";
 import Channel from "./types/channel";
 import Client from "./types/client";
 import BotResponse from "./types/response";
@@ -110,7 +110,7 @@ export function onMessageHandler(
   const splitModifiedRequest = request.trim().replace(/\s\s+/g, " ").split(" ");
   const modifiedRequest = splitModifiedRequest.join(" ");
 
-  const botResponse = executeCommand(context, splitModifiedRequest);
+  const botResponse = executeCommand(context, splitModifiedRequest, target);
 
   const responseState = new BotResponse(modifiedRequest, channel, botResponse);
 
@@ -121,7 +121,7 @@ export function onMessageHandler(
 
 client.on("connected", function(address: string, port: number): void {
   logger.info(`* Connected to ${address}:${port}`);
-  (new Tasks()).init();
+  (new Task()).init();
 });
 
 

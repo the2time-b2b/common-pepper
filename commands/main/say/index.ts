@@ -1,17 +1,22 @@
 import { Say, CommandAttributes } from "./types";
 import * as service from "./service";
-import { default as Tasks, DBTask, AtLeastOne } from "./tasks";
+import Task from "../../bot/task";
+import Trigger from "../../bot/task/triggers";
+import Action from "../../bot/task/actions";
 
 import description from "./description";
+import { ProcessError } from "../../../utils/error";
 
 
 const say: Say = {
-  exec(_context, request) {
+  exec(_context, request, channel): string {
+    if (!channel) throw Error("request origin should be speicifed.");
     if (request.length === 0) return description.usage;
 
-    const tasks = new Tasks();
+
+    const task = new Task();
     if (request.join(" ") === "clear task list") {
-      tasks.clearTasks();
+      task.clear();
       return "The task list has been wiped clean.";
     }
 
@@ -30,37 +35,51 @@ const say: Say = {
     const attributesLength = taskAttributesLength - 2;
     const attributes = request.splice(request.length - attributesLength);
 
+
     if (!service.checkAttributeStructure(attributes)) return description.usage;
 
     const message = request.join(" ");
     const interval = attributes[1];
-    const channel = attributes[3].toLowerCase();
-    const taskName = attributes[5].toLowerCase();
+    let taskName: string;
+    let targetChannel: string | undefined;
+
+    if (attributes[5]) {
+      targetChannel = attributes[3].toLowerCase();
+      taskName = attributes[5].toLowerCase();
+    }
+    else {
+      taskName = attributes[3].toLowerCase();
+    }
 
     const checkInterval = service.checkInterval(interval);
     if (!checkInterval) return description.interval;
 
-    const checkChannelName = service.checkChannelName(channel);
-    if (!checkChannelName) return description.channel;
-
-    const checkTaskName = service.checkTaskName(taskName);
-    if (!checkTaskName) return description["task-name"];
-
     const parsedInterval = service.parseInterval(interval);
-    const validatedInterval = service.validateInterval(parsedInterval);
-    if (!validatedInterval) return description.interval;
 
     const [seconds, minutes, hours] = parsedInterval;
-    const intervalInSeconds = service.convertToSeconds(seconds, minutes, hours);
 
-    const newTask: DBTask = {
-      "name": taskName,
-      "interval": intervalInSeconds,
-      "channel": channel,
-      "message": message
+
+
+    const trigger: Trigger<"repeat"> = {
+      type: "repeat",
+      value: { hours, minutes, seconds }
     };
+    const action: Action<"echo"> = {
+      type: "echo",
+      value: { channel: (targetChannel) ? targetChannel : channel, message }
+    };
+    try {
+      task.create(taskName, trigger, action);
+    }
+    catch (error) {
+      if (error instanceof ProcessError && error.options.toUser.status) {
+        return error.message;
+      }
 
-    return tasks.createTask(newTask);
+      throw error;
+    }
+
+    return `Task ${taskName} successfully created.`;
   },
 
 
@@ -68,9 +87,12 @@ const say: Say = {
     const [taskName] = request.splice(0, 1);
     if (request.length === 0) return description.modify;
 
-    const tasks = new Tasks();
+    const task = new Task();
+
     if (request.length === 1 && ["remove", "delete"].includes(request[0])) {
-      return tasks.deleteTask(taskName);
+      task.remove(taskName);
+
+      return `Task '${taskName}' successfully removed.`;
     }
 
     const [attribute] = request.splice(0, 1);
@@ -80,50 +102,34 @@ const say: Say = {
 
     const modifiedValue = request.join(" ").toLowerCase();
 
-    let modifiedTask: AtLeastOne<DBTask>;
-    let intervalInSeconds: number | null = null;
-
     if (attribute === CommandAttributes.message) {
       if (request.length === 0) return description.message;
 
-      modifiedTask = { message: modifiedValue };
+      task.updateAction(taskName, { message: modifiedValue });
+    }
+    else if (attribute === CommandAttributes.channel) {
+      task.updateAction(taskName, { channel: modifiedValue });
     }
     else if (attribute === CommandAttributes.interval) {
       if (!service.checkInterval(modifiedValue)) return description.interval;
 
       const parsedInterval = service.parseInterval(modifiedValue);
-      const validatedInterval = service.validateInterval(parsedInterval);
-      if (!validatedInterval) return description.interval;
 
       const [seconds, minutes, hours] = parsedInterval;
-      intervalInSeconds = service.convertToSeconds(seconds, minutes, hours);
 
-      modifiedTask = { interval: intervalInSeconds };
-    }
-    else if (attribute === CommandAttributes.channel) {
-      if (!service.checkChannelName(modifiedValue))
-        return description.channel;
-
-      modifiedTask = { channel: modifiedValue };
+      task.updateTrigger(taskName, { hours, minutes, seconds });
     }
     else if (attribute === CommandAttributes.name) {
-      if (!service.checkTaskName(modifiedValue))
-        return description["task-name"];
-
-      modifiedTask = { name: modifiedValue };
+      task.updateName(modifiedValue);
     }
     else {
       throw new Error("No attributes specified to modify.");
     }
 
-    /**
-     *  Modification is done one attribute at a time.
-     *  But updateTask is extensible for more than one attribute.
-     *  Note: modifiedTask is a 'Partial' of type 'Task'.
-     */
-    return tasks.updateTask(taskName, modifiedTask);
+    return `Task ${taskName} updated successfully.`;
   }
 };
 
 
 export default say;
+
