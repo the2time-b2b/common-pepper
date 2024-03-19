@@ -27,10 +27,13 @@ export default class Repeat<T extends keyof TriggerTypes> extends Triggers<T> {
   static checkJob(id: number): boolean { return Repeat.jobIDs.includes(id); }
   static clearJobs(): void { Repeat.jobIDs = []; }
 
-  /** Schedule when the trigger is invoked according to spceified interval. */
+  /** Schedule when the trigger is invoked according to spceified interval.
+   *
+   * @param value Recurring interval for task invocation.
+   * @returns ID of the created trigger.
+   */
   create(value: TriggerTypes[T]): number {
     if (!isSchedulable(value)) throw new Error();
-
     const hours = value.hours;
     const minutes = value.minutes;
     const seconds = value.seconds;
